@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Timebook
+Name[zh_CN]=时账
+Comment=Start Timebook in the background on login
+Comment[zh_CN]=登录后自动在后台启动时账
+Exec=timebook --hidden
+Icon=timebook
+Terminal=false
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=3

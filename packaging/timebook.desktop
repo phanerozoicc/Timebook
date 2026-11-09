@@ -1,0 +1,16 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Timebook
+Name[zh_CN]=时账
+GenericName=Screen Time & Focus
+GenericName[zh_CN]=屏幕时间与专注
+Comment=Local-first screen time tracker and pomodoro timer — no network, no account
+Comment[zh_CN]=纯本地的屏幕时间统计与番茄钟，零联网、零账号
+Exec=timebook
+Icon=timebook
+Terminal=false
+Categories=Utility;
+Keywords=screen time;pomodoro;focus;屏幕时间;番茄钟;专注;
+StartupNotify=true
+StartupWMClass=timebook

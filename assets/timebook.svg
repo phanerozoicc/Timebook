@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Timebook — 时账</title>
+  <desc id="desc">Deep-gray rounded tile with a tomato-red progress ring, an amber clock hand and a center dot.</desc>
+
+  <!-- 深灰圆角底 -->
+  <rect x="24" y="24" width="464" height="464" rx="104" ry="104" fill="#24272E"/>
+  <rect x="27.5" y="27.5" width="457" height="457" rx="100.5" ry="100.5" fill="none" stroke="#343943" stroke-width="3"/>
+
+  <!-- 进度环：底轨 + 72% 品牌色弧（12 点方向顺时针） -->
+  <circle cx="256" cy="256" r="150" fill="none" stroke="#3A3F49" stroke-width="44"/>
+  <path d="M256 106 A150 150 0 1 1 108.7 284.1" fill="none" stroke="#F0663F" stroke-width="44" stroke-linecap="round"/>
+
+  <!-- 琥珀色指针 + 中心圆点 -->
+  <path d="M256 256 L331 169" fill="none" stroke="#F5A524" stroke-width="26" stroke-linecap="round"/>
+  <circle cx="256" cy="256" r="27" fill="#F5A524"/>
+</svg>

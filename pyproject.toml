@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "timebook"
+version = "1.0.0"
+description = "时账 Timebook — 纯本地 Linux 屏幕时间统计 + 专注工具"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Timebook Linux port" }]
+keywords = ["screen-time", "pomodoro", "privacy", "gtk4", "linux"]
+# 零第三方依赖：只用 Python 标准库 + 系统 PyGObject (GTK4 / libadwaita)。
+dependencies = []
+
+[project.scripts]
+timebook = "timebook.main:main"
+
+[project.optional-dependencies]
+# 桌面集成所需的系统包（Debian/Ubuntu）：
+#   python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 gir1.2-ayatanaappindicator3-0.1 \
+#   libxss1 x11-utils libnotify-bin fonts-noto-cjk
+dev = []
+
+[tool.setuptools.packages.find]
+include = ["timebook*"]
+
+[tool.setuptools.package-data]
+timebook = ["assets/*.svg", "assets/*.png", "assets/*.css"]
