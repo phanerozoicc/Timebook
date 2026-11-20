@@ -423,7 +423,9 @@ class UIWorkflowTests(unittest.TestCase):
             )
         except (OSError, subprocess.SubprocessError):
             return None
-        return out.returncode == 0 and "no such property" not in out.stdout
+        # 判据是输出里出现 "window id"：xprop 对缺失属性可能把提示写到
+        # stderr，用 "没有该属性" 反推不可靠，认 window id 才稳。
+        return "window id" in out.stdout.lower() or "window id" in out.stderr.lower()
 
     def test_microbreak_fills_monitor_and_centers_content(self):
         if self._window_manager_present() is False:
