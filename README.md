@@ -62,4 +62,4 @@ sudo apt install -y python3 python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 \
 
 - **单主线开发**：日常都在 `main` 上提交；平台专属的大改动先在各自目录内完成，不长期分叉，避免两套主分支漂移。
 - **对齐即文档**：跨平台的对应关系写在代码注释与 [`apps/linux/docs/architecture.md`](apps/linux/docs/architecture.md) 里，改动一侧时检查另一侧是否需要同步。
-- **发布各自打 tag**：`macos-v4`、`linux-v1` 之类，平台前缀区分。
+- **发布**：打 `v*` tag 触发 `.github/workflows/release.yml`，自动构建双端安装包（macOS `.app` zip + Linux tar.gz）并附到同一个 GitHub Release。
