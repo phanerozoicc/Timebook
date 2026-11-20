@@ -1,0 +1,12 @@
+# macOS
+.DS_Store
+
+# 本地构建产物
+build/
+
+# XcodeGen 生成的工程（source of truth 是 project.yml，克隆后先 xcodegen generate）
+Timebook.xcodeproj
+
+# Xcode 用户态
+xcuserdata/
+*.xcuserstate
