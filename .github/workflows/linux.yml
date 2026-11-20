@@ -1,0 +1,40 @@
+name: linux
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/linux/**", ".github/workflows/linux.yml"]
+  pull_request:
+    paths: ["apps/linux/**", ".github/workflows/linux.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/linux
+    steps:
+      - uses: actions/checkout@11d5960a326750d58d8078e36cf385cf677262 # v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3 python3-gi python3-cairo python3-dbus \
+            gir1.2-gtk-4.0 gir1.2-adw-1 \
+            libxss1 x11-utils libnotify-bin xvfb fonts-noto-cjk
+
+      - name: Compile and syntax checks + full test suite
+        run: xvfb-run -a python3 scripts/check.py
+
+      - name: Upload test artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-test-logs
+          path: apps/linux/.timebook-verify/
+          if-no-files-found: ignore

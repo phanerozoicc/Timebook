@@ -1,0 +1,36 @@
+name: macos
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/macos/**", ".github/workflows/macos.yml"]
+  pull_request:
+    paths: ["apps/macos/**", ".github/workflows/macos.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/macos
+    steps:
+      - uses: actions/checkout@11d5960a326750d58d8078e36cf385cf677262 # v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build and run unit tests (ad-hoc signing)
+        run: |
+          xcodebuild -project Timebook.xcodeproj \
+            -scheme Timebook \
+            -configuration Debug \
+            -destination "platform=macOS" \
+            CODE_SIGNING_ALLOWED=NO \
+            test
