@@ -125,7 +125,7 @@ final class ForfeitTests: XCTestCase {
         store.addDistractor(DistractorApp(id: "com.test.safari", name: "Safari", path: "/Applications/Safari.app"))
         store.addDistractor(DistractorApp(id: "com.test.game", name: "Game", path: "/Applications/Game.app"))
         XCTAssertTrue(store.ledger.markLost(at: calendar.date(
-            from: DateComponents(timeZone: calendar.timeZone, year: 2026, month: 10, day: 26, hour: 14))!))
+            from: DateComponents(timeZone: .current, year: 2026, month: 10, day: 26, hour: 14))!))
         try store.save()
 
         let reloaded = try ForfeitStore(directory: dir)

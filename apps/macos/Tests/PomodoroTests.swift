@@ -48,7 +48,7 @@ final class PomodoroTests: XCTestCase {
         XCTAssertEqual(workSegments[0].0.timeIntervalSince1970, t0.timeIntervalSince1970, accuracy: 0.001)
         XCTAssertEqual(workSegments[0].1.timeIntervalSince1970, workEnd.timeIntervalSince1970, accuracy: 0.001)
         XCTAssertTrue(workSegments[0].2)
-        XCTAssertEqual(notifications.first?.0, "番茄完成 🍅")
+        XCTAssertEqual(notifications.first?.0, T("番茄完成 🍅", "Pomodoro done 🍅"))
     }
 
     func testFourthRoundGoesLongBreak() {
@@ -67,7 +67,7 @@ final class PomodoroTests: XCTestCase {
             }
         }
         XCTAssertEqual(engine.state.phase, .long)
-        XCTAssertEqual(notifications.last?.0, "该长休啦 ☕️")
+        XCTAssertEqual(notifications.last?.0, T("该长休啦 ☕️", "Long break time ☕️"))
         XCTAssertEqual(engine.state.round, 1, "长休后回到第 1 轮")
         XCTAssertEqual(workSegments.count, 4)
     }
