@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import Mock
 
+from timebook.core.l10n import set_language, reset_for_tests
 from timebook.core.pomodoro import PomodoroEngine, PomodoroPhase
 from timebook.core.settings import Settings
 from timebook.core.store import Store
@@ -43,6 +45,7 @@ def make_tray(store: Store, **callbacks):
     tray._label = ""
     tray._tooltip = ""
     tray._status_line = ""
+    tray._pomodoro_text = ""
     tray._icon = b""
     tray._icon_size = 22
     tray._bus = None
@@ -79,6 +82,8 @@ class IconTests(unittest.TestCase):
 
 class TrayLogicTests(unittest.TestCase):
     def setUp(self) -> None:
+        set_language("zh")
+        self.addCleanup(reset_for_tests)
         self.store = Store(":memory:")
         self.events: list[str] = []
         self.tray = make_tray(
@@ -95,7 +100,7 @@ class TrayLogicTests(unittest.TestCase):
 
     def test_menu_has_expected_actions(self) -> None:
         keys = [entry[2] for entry in MENU_LAYOUT if entry[1] == "action"]
-        self.assertEqual(keys, ["open", "pause", "water", "break", "quit"])
+        self.assertEqual(keys, ["open", "pomodoro", "pause", "water", "break", "quit"])
 
     def test_activate_dispatches_each_action(self) -> None:
         ids = {entry[2]: entry[0] for entry in MENU_LAYOUT if entry[1] == "action"}
@@ -108,13 +113,63 @@ class TrayLogicTests(unittest.TestCase):
 
     def test_label_shows_today_duration_when_idle(self) -> None:
         self.tray.refresh(force=True)
-        self.assertEqual(self.tray._label, "1h01m", "非番茄期间托盘标签显示今日时长")
+        self.assertEqual(self.tray._label, "1时01分", "非番茄期间托盘标签显示今日时长")
 
     def test_label_shows_countdown_during_focus(self) -> None:
         self.tray._ctx.pomodoro.start()
         self.tray.refresh(force=True)
         self.assertTrue(self.tray._label.startswith("🍅"), f"专注时标签应为番茄倒计时，实际 {self.tray._label!r}")
-        self.assertIn("25:00", self.tray._label)
+        self.assertIn("40:00", self.tray._label)
+
+    def test_pomodoro_action_starts_pauses_and_resumes(self) -> None:
+        item_id = next(entry[0] for entry in MENU_LAYOUT if entry[2] == "pomodoro")
+        engine = self.tray._ctx.pomodoro
+        self.assertIn("40", self.tray._menu_text("pomodoro"))
+
+        self.tray._activate(item_id)
+        self.assertEqual(engine.state.phase, PomodoroPhase.WORK)
+        self.assertIn("40:00", self.tray._label)
+        self.assertEqual(self.tray._pomodoro_text, self.tray._menu_text("pomodoro"))
+
+        self.tray._activate(item_id)
+        self.assertTrue(engine.state.paused)
+        self.assertIn("⏸", self.tray._label)
+
+        self.tray._activate(item_id)
+        self.assertFalse(engine.state.paused)
+        self.assertFalse(self.tray._ctx.settings.paused)
+        self.assertEqual(self.tray._ctx.tracker.closed, 0)
+
+    def test_pomodoro_action_starts_ready_phases(self) -> None:
+        item_id = next(entry[0] for entry in MENU_LAYOUT if entry[2] == "pomodoro")
+        now = self.tray._ctx.pomodoro.now
+        engine = PomodoroEngine(self.store, now_fn=lambda: now)
+        self.tray._ctx.pomodoro = engine
+        engine.auto_start_breaks = False
+        self.tray._activate(item_id)
+        now = engine.state.ends_at
+        engine.tick()
+        self.assertEqual(engine.state.phase, PomodoroPhase.SHORT_READY)
+        self.tray._activate(item_id)
+        self.assertEqual(engine.state.phase, PomodoroPhase.SHORT)
+        now = engine.state.ends_at
+        engine.tick()
+        self.assertEqual(engine.state.phase, PomodoroPhase.WORK_READY)
+        self.tray._activate(item_id)
+        self.assertEqual(engine.state.phase, PomodoroPhase.WORK)
+        self.assertEqual(engine.state.round, 2)
+
+    def test_pomodoro_menu_refreshes_while_tracking_paused(self) -> None:
+        self.tray._ctx.settings.paused = True
+        self.tray.refresh()
+        self.tray.available = True
+        self.tray._item = Mock()
+        self.tray._menu = Mock()
+        self.tray._dbus = Mock()
+        self.tray._ctx.pomodoro.start()
+        self.tray.refresh()
+        self.tray._menu.LayoutUpdated.assert_called_once()
+        self.assertEqual(self.tray._label, "⏸")
 
     def test_label_shows_pause_marker(self) -> None:
         self.tray._ctx.pomodoro.start()
@@ -156,8 +211,14 @@ class TrayLogicTests(unittest.TestCase):
         try:
             set_language("en")
             self.assertIn("Open", self.tray._menu_text("open"))
+            self.assertEqual(self.tray._menu_text("pomodoro"), "Start pomodoro (40 min)")
+            self.tray._ctx.pomodoro.start()
+            self.assertEqual(self.tray._menu_text("pomodoro"), "Pause pomodoro")
+            self.tray._ctx.pomodoro.pause()
+            self.assertEqual(self.tray._menu_text("pomodoro"), "Resume pomodoro")
             set_language("zh")
             self.assertIn("打开", self.tray._menu_text("open"))
+            self.assertEqual(self.tray._menu_text("pomodoro"), "继续番茄钟")
         finally:
             reset_for_tests()
 

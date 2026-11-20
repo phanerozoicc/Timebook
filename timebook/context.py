@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Callable
 
 from .core.forfeit import ForfeitStore
@@ -35,8 +35,14 @@ class AppContext:
         if self.notifier is not None and hasattr(self.notifier, "send"):
             self.notifier.send(title, body)
 
-    def today_rows(self):
-        return self.store.today_rows()
+    def rows(self, start, end, now=None):
+        return self.tracker.rows(start, end, now)
+
+    def today_rows(self, now=None):
+        from .core.models import today_start
+
+        now = now or datetime.now()
+        return self.rows(today_start(now), today_start(now) + timedelta(days=1), now)
 
     def today_total(self) -> float:
         return self.tracker.today_seconds()

@@ -5,8 +5,11 @@ from __future__ import annotations
 import gi
 
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk  # noqa: E402
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gtk  # noqa: E402
 
+from ...core.l10n import resolved_language
+from .. import widgets as W
 from ..theme import GAP  # noqa: E402
 
 
@@ -17,16 +20,27 @@ class Page(Gtk.ScrolledWindow):
         super().__init__()
         self._ctx = ctx
         self.name = name
+        self._language = resolved_language()
         self.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
         self.set_hexpand(True)
         self.set_vexpand(True)
 
         self.body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=GAP)
-        self.body.set_margin_top(18)
+        self.body.set_margin_top(24)
         self.body.set_margin_bottom(24)
         self.body.set_margin_start(22)
         self.body.set_margin_end(22)
-        self.set_child(self.body)
+        clamp = Adw.Clamp(maximum_size=1080, tightening_threshold=900)
+        clamp.set_child(self.body)
+        self.set_child(clamp)
+
+    def refresh_language(self) -> bool:
+        language = resolved_language()
+        if language == self._language:
+            return False
+        self._language = language
+        W.refresh_translations(self)
+        return True
 
     def refresh(self, force: bool = False) -> None:  # pragma: no cover - 子类实现
         """由 App 定时驱动（约 2 秒一次）。``force`` 忽略增量缓存。"""

@@ -68,7 +68,7 @@ class PomodoroPhase(str, Enum):
 
 @dataclass(frozen=True, slots=True)
 class PomodoroPreset:
-    work_min: int = 25
+    work_min: int = 40
     short_break_min: int = 5
     long_break_min: int = 15
     rounds: int = 4
@@ -79,18 +79,18 @@ class PomodoroPreset:
 
 
 PRESETS: dict[str, PomodoroPreset] = {
-    "classic": PomodoroPreset(25, 5, 15, 4),
+    "classic": PomodoroPreset(40, 5, 15, 4),
     "sprint": PomodoroPreset(15, 3, 10, 4),
     "deep": PomodoroPreset(50, 10, 20, 3),
     "custom": PomodoroPreset(30, 5, 15, 4),
 }
 
-#: 预设选择器顺序（文案与 macOS 版一致，中文为源语言）。
-PRESET_NAMES: list[tuple[str, str]] = [
-    ("classic", "经典 25/5"),
-    ("sprint", "冲刺 15/3"),
-    ("deep", "深度 50/10"),
-    ("custom", "自定义 30/5"),
+#: 预设选择器顺序（中文为源语言）。
+PRESET_NAMES: list[tuple[str, tuple[str, str]]] = [
+    ("classic", ("经典 40/5", "Classic 40/5")),
+    ("sprint", ("冲刺 15/3", "Sprint 15/3")),
+    ("deep", ("深度 50/10", "Deep 50/10")),
+    ("custom", ("自定义 30/5", "Custom 30/5")),
 ]
 
 
@@ -253,6 +253,7 @@ class PomodoroEngine:
         now = now or self._now()
         if not self.state.paused:
             return
+        self.now = now
         self.state.paused = False
         self.state.ends_at = now + timedelta(seconds=self.state.paused_remaining)
         self._persist()
@@ -361,7 +362,8 @@ class PomodoroEngine:
             preset = self.preset
             planned = self.state.ends_at or now
             started_at = planned - timedelta(minutes=preset.work_min)
-            ended_at = now if skipped else planned
+            ended_at = (planned - timedelta(seconds=self.state.paused_remaining)
+                        if skipped and self.state.paused else now if skipped else planned)
             worked = max(0.0, min((ended_at - started_at).total_seconds(), preset.work_seconds))
             segment = WorkSegment(
                 start=started_at,

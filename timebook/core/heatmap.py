@@ -44,9 +44,11 @@ def color_for(level: int) -> str:
 
 
 def level_hint(level: int) -> str:
-    return (
-        "0–15m", "15–30m", "30–60m", "1–2h", "2–4h", "4–6h", "≥6h"
-    )[min(max(0, level), 6)]
+    index = min(max(0, level), 6)
+    return T(
+        ("0–15分", "15–30分", "30–60分", "1–2时", "2–4时", "4–6时", "≥6时")[index],
+        ("0–15m", "15–30m", "30–60m", "1–2h", "2–4h", "4–6h", "≥6h")[index],
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,7 +67,7 @@ class HeatCell:
 
     @property
     def label(self) -> str:
-        return f"{self.day.strftime('%m/%d')} · {int(self.seconds // 60)}m"
+        return f"{self.day.strftime('%m/%d')} · " + T(f"{int(self.seconds // 60)}分", f"{int(self.seconds // 60)}m")
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,7 +110,9 @@ class HeatGrid:
         start = end - timedelta(days=days - 1)
 
         buckets: dict[date, float] = {}
-        for row in rows:
+        from .models import daily_parts
+
+        for row in daily_parts(rows):
             day = row.start.date()
             if start <= day <= end:
                 buckets[day] = buckets.get(day, 0.0) + row.duration

@@ -161,6 +161,8 @@ class FormatTests(unittest.TestCase):
         reset_for_tests()
 
     def test_fmt_compact(self) -> None:
+        set_language("en")
+        self.addCleanup(reset_for_tests)
         self.assertEqual(models.fmt_duration(0, compact=True), "0s")
         self.assertEqual(models.fmt_duration(59, compact=True), "59s")
         self.assertEqual(models.fmt_duration(60, compact=True), "1m")
@@ -282,6 +284,10 @@ class HeatmapTests(unittest.TestCase):
 
 
 class ExporterTests(unittest.TestCase):
+    def setUp(self) -> None:
+        set_language("zh")
+        self.addCleanup(reset_for_tests)
+
     def test_csv_header_and_bom(self) -> None:
         text = csv_text([make_row(host="github.com")])
         self.assertTrue(text.startswith("\ufeff"), "CSV 需带 BOM 以便 Excel 正确识别")

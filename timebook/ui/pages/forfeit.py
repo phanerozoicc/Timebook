@@ -15,7 +15,8 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Pango  # noqa: E402
 
 from ...core.categories import ALL as CATEGORIES  # noqa: E402
-from ...core.forfeit import ToggleOutcome  # noqa: E402
+from ...core.forfeit import ToggleOutcome
+from ...core.l10n import T, count_label  # noqa: E402
 from .. import widgets as W  # noqa: E402
 from ..theme import AMBER, BRAND, CALM_BLUE, GAP, WELL_GREEN  # noqa: E402
 from .base import Page  # noqa: E402
@@ -24,85 +25,58 @@ LOST_COLOR = 0xE5484D
 KEPT_COLOR = 0x2E3A45
 
 
-class HourGrid(Gtk.Widget):
-    """一天 24 格（2 行 × 12 列）；荒 = 红，守 = 深灰，未来 = 极暗。"""
-
-    CELL_W = 34
-    CELL_H = 30
-    GAP = 5
-    TOP = 14
+class HourGrid(Gtk.Grid):
+    """24 native toggle buttons: keyboard access and a label beyond color."""
 
     def __init__(self, on_toggle=None) -> None:
-        super().__init__()
-        self._lost: set[int] = set()
-        self._current_hour = 0
+        super().__init__(column_spacing=6, row_spacing=6)
+        self.set_column_homogeneous(True)
         self._day = ""
         self._on_toggle = on_toggle
-        self.set_size_request(12 * (self.CELL_W + self.GAP), 2 * (self.CELL_H + self.GAP) + self.TOP)
-        self._area = Gtk.DrawingArea()
-        self._area.set_draw_func(self._draw)
-        self._container = Gtk.Box()
-        self._container.append(self._area)
-        self.set_layout_manager(Gtk.BinLayout())
-        self._container.set_parent(self)
-
-        click = Gtk.GestureClick()
-        click.connect("pressed", self._on_click)
-        self._area.add_controller(click)
+        self.buttons = []
+        for hour in range(24):
+            button = Gtk.ToggleButton()
+            button.add_css_class("tb-hour")
+            button.set_hexpand(True)
+            button.connect("clicked", self._clicked, hour)
+            self.attach(button, hour % 8, hour // 8, 1, 1)
+            self.buttons.append(button)
 
     def set_state(self, day: str, lost: set[int], current_hour: int) -> None:
-        self._day, self._lost, self._current_hour = day, set(lost), current_hour
-        self._area.queue_draw()
-
-    def _cell_rect(self, hour: int) -> tuple[float, float, float, float]:
-        row, col = divmod(hour, 12)
-        x = col * (self.CELL_W + self.GAP)
-        y = self.TOP + row * (self.CELL_H + self.GAP)
-        return x, y, self.CELL_W, self.CELL_H
-
-    def _draw(self, _area, cr, w, h):
-        for hour in range(24):
-            x, y, cw, ch = self._cell_rect(hour)
-            lost = hour in self._lost
-            future = hour > self._current_hour
-            if lost:
-                W.fill_rounded(cr, x, y, cw, ch, 8, LOST_COLOR, 0.9)
-                text_color = (1, 1, 1, 0.95)
-            elif future:
-                W.fill_rounded(cr, x, y, cw, ch, 8, 0xFFFFFF, 0.04)
-                text_color = (1, 1, 1, 0.22)
+        self._day = day
+        for hour, button in enumerate(self.buttons):
+            status = T("荒", "Lost") if hour in lost else T("守", "Kept")
+            future = hour > current_hour
+            if future:
+                status = "—"
+            button.set_label(f"{hour:02d}  {status}")
+            button.set_active(hour in lost)
+            button.set_sensitive(not future)
+            if hour == current_hour:
+                button.add_css_class("current")
             else:
-                W.fill_rounded(cr, x, y, cw, ch, 8, KEPT_COLOR, 0.55)
-                text_color = (1, 1, 1, 0.5)
-            W.draw_text(cr, f"{hour}", x + cw / 2, y + 7, size=11,
-                        color=text_color, align="center", weight=Pango.Weight.BOLD)
-            if hour == self._current_hour:
-                cr.set_line_width(1.5)
-                cr.set_source_rgba(*W.rgba(BRAND, 0.95))
-                W.rounded_rect(cr, x + 0.75, y + 0.75, cw - 1.5, ch - 1.5, 8)
-                cr.stroke()
+                button.remove_css_class("current")
+            text = T(f"{hour:02d}:00 · {status}", f"{hour:02d}:00 · {status}")
+            button.set_tooltip_text(text)
+            W.accessible(button, text)
 
-    def _on_click(self, gesture, _n_press, x, y) -> None:
-        col = int(x // (self.CELL_W + self.GAP))
-        row = int((y - self.TOP) // (self.CELL_H + self.GAP))
-        if not (0 <= col < 12 and 0 <= row < 2):
-            return
-        hour = row * 12 + col
+    def _clicked(self, _button, hour) -> None:
         if self._on_toggle:
             self._on_toggle(self._day, hour)
-        gesture.set_state(Gtk.EventSequenceState.CLAIMED)
 
 
 class ForfeitPage(Page):
     def __init__(self, ctx) -> None:
         super().__init__(ctx, "forfeit")
+        self._rules_signature = None
+        self._known_apps = None
 
         # 概览
         cards = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         cards.set_homogeneous(True)
-        self.card_today = W.StatCard("media-record-symbolic", "今日荒废", "0 小时", LOST_COLOR)
-        self.card_streak = W.StatCard("emblem-ok-symbolic", "连续干净天", "0 天", WELL_GREEN)
-        self.card_month = W.StatCard("office-calendar-symbolic", "最近 30 天", "0 小时", AMBER)
+        self.card_today = W.StatCard("media-record-symbolic", ('今日荒废', 'Hours lost today'), ('0 小时', '0 hours'), LOST_COLOR)
+        self.card_streak = W.StatCard("emblem-ok-symbolic", ('连续干净天', 'Clean streak'), ('0 天', '0 days'), WELL_GREEN)
+        self.card_month = W.StatCard("office-calendar-symbolic", ('最近 30 天', 'Last 30 days'), ('0 小时', '0 hours'), AMBER)
         for card in (self.card_today, self.card_streak, self.card_month):
             cards.append(card)
         self.body.append(cards)
@@ -110,15 +84,15 @@ class ForfeitPage(Page):
         # 24 格
         grid_card = W.card(10)
         head = W.hbox(8)
-        head.append(W.label("一天 24 格", "tb-section"))
+        head.append(W.label(('一天 24 格', '24 hours at a glance'), "tb-section"))
         head.append(W.spacer())
-        self.grid_hint = W.label("点击格子可手动改判", "tb-caption")
+        self.grid_hint = W.label(('点击格子可手动改判', 'Click an hour to change its status'), "tb-caption")
         head.append(self.grid_hint)
         grid_card.append(head)
         self.grid = HourGrid(self._toggle_hour)
         grid_card.append(self.grid)
         legend = W.hbox(14)
-        for color, text in ((LOST_COLOR, "荒：分心应用占用"), (KEPT_COLOR, "守：清醒使用"), (BRAND, "当前小时")):
+        for color, text in ((LOST_COLOR, ("荒：分心应用占用", "Lost: distracting activity")), (KEPT_COLOR, ("守：清醒使用", "Kept: mindful activity")), (BRAND, ("当前小时", "Current hour"))):
             row = W.hbox(6)
             dot = W.color_dot(color, 9)
             row.append(dot)
@@ -129,17 +103,17 @@ class ForfeitPage(Page):
 
         # 最近 14 天柱状
         bars_card = W.card(8)
-        bars_card.append(W.SectionHeader("office-calendar-symbolic", "最近 14 天", "每天荒废小时数"))
+        bars_card.append(W.SectionHeader("office-calendar-symbolic", ('最近 14 天', 'Last 14 days'), ('每天荒废小时数', 'Hours lost each day')))
         self.bars = W.BarChart(130)
         bars_card.append(self.bars)
         self.body.append(bars_card)
 
         # 分心应用名单
         apps_card = W.card(8)
-        apps_card.append(W.SectionHeader("applications-system-symbolic", "分心应用", "被切到前台即判荒"))
+        apps_card.append(W.SectionHeader("applications-system-symbolic", ('分心应用', 'Distracting apps'), ('被切到前台即判荒', 'Using one marks the hour as lost')))
         self.app_rows = W.vbox(2)
         apps_card.append(self.app_rows)
-        self.app_empty = W.EmptyState("emblem-ok-symbolic", "还没有设置分心应用。从下面最近用过的应用里挑一个。")
+        self.app_empty = W.EmptyState("emblem-ok-symbolic", ('还没有设置分心应用。从下面最近用过的应用里挑一个。', 'Choose a recently used app below to mark it as distracting.'))
         apps_card.append(self.app_empty)
 
         picker_row = W.hbox(8)
@@ -147,7 +121,9 @@ class ForfeitPage(Page):
         self.app_picker.set_hexpand(True)
         self._app_ids: list[str] = []
         picker_row.append(self.app_picker)
-        add_app = Gtk.Button(label="加入名单")
+        add_app = W.translated(Gtk.Button(), label=('加入名单', 'Add to list'))
+        self.add_app_button = add_app
+        W.translated(self.app_picker, accessible=("选择分心应用", "Choose a distracting app"))
         add_app.add_css_class("tb-ghost")
         add_app.connect("clicked", self._add_distractor)
         picker_row.append(add_app)
@@ -156,7 +132,7 @@ class ForfeitPage(Page):
 
         # 分心类目
         cat_card = W.card(8)
-        cat_card.append(W.SectionHeader("view-grid-symbolic", "分心类目", "浏览器命中这些类目即判荒"))
+        cat_card.append(W.SectionHeader("view-grid-symbolic", ('分心类目', 'Distracting categories'), ('浏览器命中这些类目即判荒', 'Browsing these categories marks the hour as lost')))
         self.cat_flow = Gtk.FlowBox()
         self.cat_flow.set_selection_mode(Gtk.SelectionMode.NONE)
         self.cat_flow.set_max_children_per_line(5)
@@ -168,8 +144,10 @@ class ForfeitPage(Page):
                 continue
             row = W.hbox(6)
             row.append(W.color_dot(category.hex_color, 8))
-            row.append(W.label(category.name_zh if self._zh() else category.name_en, "tb-caption"))
+            row.append(W.label((category.name_zh, category.name_en), "tb-caption"))
             switch = Gtk.Switch()
+            switch.set_valign(Gtk.Align.CENTER)
+            W.translated(switch, accessible=(category.name_zh, category.name_en))
             switch.connect("notify::active", self._toggle_category, category.id)
             self.cat_switches[category.id] = switch
             row.append(switch)
@@ -179,30 +157,30 @@ class ForfeitPage(Page):
 
         # 自定义域名
         dom_card = W.card(8)
-        dom_card.append(W.SectionHeader("network-server-symbolic", "自定义分心网站", "域名后缀匹配"))
+        dom_card.append(W.SectionHeader("network-server-symbolic", ('自定义分心网站', 'Custom distracting sites'), ('域名后缀匹配', 'Includes matching subdomains')))
         self.dom_rows = W.vbox(2)
         dom_card.append(self.dom_rows)
         entry_row = W.hbox(8)
         self.dom_entry = Gtk.Entry()
-        self.dom_entry.set_placeholder_text("例如 douyin.com")
+        W.translated(self.dom_entry, placeholder_text=('例如 douyin.com', 'e.g. douyin.com'))
+        W.translated(self.dom_entry, accessible=("自定义分心网站域名", "Distracting site domain"))
         self.dom_entry.set_hexpand(True)
         self.dom_entry.connect("activate", self._add_domain)
         entry_row.append(self.dom_entry)
-        add_dom = Gtk.Button(label="添加")
+        add_dom = W.translated(Gtk.Button(), label=('添加', 'Add'))
         add_dom.add_css_class("tb-ghost")
         add_dom.connect("clicked", self._add_domain)
         entry_row.append(add_dom)
         dom_card.append(entry_row)
+        self.dom_error = W.label("", "tb-error", wrap=True)
+        self.dom_error.set_visible(False)
+        dom_card.append(self.dom_error)
         self.body.append(dom_card)
 
         self._syncing = False
 
     # ------------------------------------------------------------------ #
 
-    def _zh(self) -> bool:
-        from ...core.l10n import resolved_language
-
-        return resolved_language() == "zh"
 
     def _toggle_hour(self, day: str, hour: int) -> None:
         outcome = self._ctx.forfeit.ledger.toggle(day, hour)
@@ -220,7 +198,13 @@ class ForfeitPage(Page):
         text = self.dom_entry.get_text().strip()
         if text and self._ctx.forfeit.add_custom_domain(text):
             self.dom_entry.set_text("")
+            self.dom_entry.remove_css_class("error")
+            self.dom_error.set_visible(False)
             self.refresh(force=True)
+        else:
+            self.dom_entry.add_css_class("error")
+            self.dom_error.set_text(T("请输入有效域名，并检查是否已在名单中。", "Enter a valid domain that is not already listed."))
+            self.dom_error.set_visible(True)
 
     def _add_distractor(self, _widget) -> None:
         index = self.app_picker.get_selected()
@@ -229,15 +213,18 @@ class ForfeitPage(Page):
             self.refresh(force=True)
 
     def refresh(self, force: bool = False) -> None:
+        force = self.refresh_language() or force
+        if self.dom_error.get_visible():
+            self.dom_error.set_text(T("请输入有效域名，并检查是否已在名单中。", "Enter a valid domain that is not already listed."))
         now = datetime.now()
         ledger = self._ctx.forfeit.ledger
         day = ledger.current_day_key
         lost = ledger.lost_hours(day)
 
         self.grid.set_state(day, lost, now.hour)
-        self.card_today.set_value(f"{len(lost)} 小时")
-        self.card_streak.set_value(f"{ledger.clean_streak()} 天")
-        self.card_month.set_value(f"{ledger.total_lost(30)} 小时")
+        self.card_today.set_value(count_label(len(lost), "hour"))
+        self.card_streak.set_value(count_label(ledger.clean_streak(), "day"))
+        self.card_month.set_value(count_label(ledger.total_lost(30), "hour"))
 
         bars = ledger.last_n_day_bars(14)
         self.bars.set_points(
@@ -245,6 +232,13 @@ class ForfeitPage(Page):
             LOST_COLOR,
         )
 
+        known = [app for app in self._ctx.store.known_apps() if app[0] not in self._ctx.forfeit.distractor_apps]
+        signature = (tuple(sorted(self._ctx.forfeit.distractor_apps)),
+                     tuple(sorted(self._ctx.forfeit.enabled_categories)),
+                     tuple(sorted(self._ctx.forfeit.custom_domains)), tuple(known))
+        if signature == self._rules_signature and not force:
+            return
+        self._rules_signature = signature
         # 分心应用列表
         self._sync_switches()
         child = self.app_rows.get_first_child()
@@ -260,17 +254,23 @@ class ForfeitPage(Page):
             row.add_css_class("tb-row")
             row.append(W.label(app_id, ellipsize=Pango.EllipsizeMode.END))
             row.append(W.spacer())
-            remove = Gtk.Button(label="移除")
+            remove = W.translated(Gtk.Button(), label=('移除', 'Remove'))
             remove.add_css_class("tb-ghost")
             remove.connect("clicked", lambda _b, a=app_id: self._remove_distractor(a))
             row.append(remove)
             self.app_rows.append(row)
 
         # 应用候选
-        known = [app for app in self._ctx.store.known_apps() if app[0] not in self._ctx.forfeit.distractor_apps]
-        self._app_ids = [app_id for app_id, _name in known]
-        names = [f"{name}" for _app_id, name in known]
-        self.app_picker.set_model(Gtk.StringList.new(names or ["（暂无可用应用）"]))
+        if known != self._known_apps or force:
+            index = self.app_picker.get_selected()
+            selected = self._app_ids[index] if 0 <= index < len(self._app_ids) else None
+            self._known_apps = known
+            self._app_ids = [app_id for app_id, _name in known]
+            self.app_picker.set_model(Gtk.StringList.new([name for _, name in known] or [T("（暂无可用应用）", "No apps available")]))
+            if selected in self._app_ids:
+                self.app_picker.set_selected(self._app_ids.index(selected))
+            self.app_picker.set_sensitive(bool(known))
+            self.add_app_button.set_sensitive(bool(known))
 
         # 自定义域名
         child = self.dom_rows.get_first_child()
@@ -283,7 +283,7 @@ class ForfeitPage(Page):
             row.add_css_class("tb-row")
             row.append(W.label(domain, "tb-mono", ellipsize=Pango.EllipsizeMode.END))
             row.append(W.spacer())
-            remove = Gtk.Button(label="移除")
+            remove = W.translated(Gtk.Button(), label=('移除', 'Remove'))
             remove.add_css_class("tb-ghost")
             remove.connect("clicked", lambda _b, d=domain: self._remove_domain(d))
             row.append(remove)

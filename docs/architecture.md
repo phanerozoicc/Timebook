@@ -74,7 +74,7 @@
 | `ui/pages/*.py` | 五个页面 | 今日 / 专注 / 统计 / 时间线 / 丢小时 |
 | `ui/settings_window.py` | 设置 | Adw.PreferencesPage：记录、限额、提醒、排除应用、外观与数据 |
 | `ui/export_dialog.py` | 导出 | XDG 下载目录、CSV + Markdown、Adw.Toast、打开文件夹 |
-| `ui/overlay.py` | 微休息 | 20 秒全屏渐变遮罩 + 倒计时环 + 跳过 |
+| `ui/overlay.py` | 微休息 | 20 秒全屏遮罩 + 倒计时环 + 跳过 / Escape |
 | `ui/tray.py` | 托盘 | StatusNotifierItem（D-Bus）：标签 + 菜单；不可用则 `available=False` |
 | `ui/introspect.py` | 界面自省 | 导出可见控件文本/数量，供自动化验证，不参与产品逻辑 |
 
@@ -111,7 +111,7 @@ core/models.py  聚合：total / by_app / by_host / by_category / per_day / segm
 ui/pages/*  刷新当前页；侧边栏与托盘同步更新
 ```
 
-**关键语义**：数据库只保存**已关闭的段**；当前段在内存中，`Tracker.today_seconds()` 会把「现在 − 段开始」加进去，所以界面数字实时增长。暂停、空闲、锁屏、排除应用都不产生数据，保证「没有记录 == 不在用电脑」。
+**关键语义**：数据库只保存**已关闭的段**；当前段在内存中，`Tracker.rows()` 在锁内合并已落库段与进行中的段，`AppContext.rows()/today_rows()` 和 `today_seconds()` 共享此入口。查询按半开区间裁剪，每日聚合与热力图按本地午夜拆分，避免跨日重复或漏计。暂停、空闲、锁屏、排除应用都不产生数据，保证「没有记录 == 不在用电脑」。
 
 **段变化副作用**：`Tracker.on_segment_change(app_id, host)` → `ForfeitStore.observe()`，若命中分心应用/类目/域名，把当前小时记入 `forfeit_days`，并立即持久化。
 
@@ -145,7 +145,7 @@ FocusPage 按钮 / 快捷键 / 托盘
 ### 3.4 快照与导出
 
 - **快照**：`App._write_snapshot()` 在 UI tick 中调用，内部 55 秒节流（约 60 秒一次），原子写入 `~/.local/share/timebook/widget-snapshot.json`。字段：`todaySeconds`、`level`、`levelName`、`levelLabel`、`pomoPhase`、`pomoRemain`、`pomoRound`、`pomoTotal`、`topAppName`、`generatedAt`。对应 macOS WidgetKit 的数据面，Linux 上作为可选读取方（脚本/第三方小组件）。
-- **导出**：`export_dialog.extract_to_downloads()` → `store.today_rows()` → `exporter.export_csv()`（UTF-8 BOM）与 `exporter.export_markdown()`（7 天周报）→ 写入 XDG 下载目录 → Adw.Toast。
+- **导出**：`export_dialog.extract_to_downloads()` → `AppContext.today_rows()/rows()`（包含进行中段）→ `exporter.export_csv()`（UTF-8 BOM）与 `weekly_markdown()`（7 天周报，遵循喝水目标）→ 写入 XDG 下载目录 → Adw.Toast。
 
 ### 3.5 数据库结构
 
@@ -207,7 +207,7 @@ FocusPage 按钮 / 快捷键 / 托盘
 | 浏览器标题解析失败 | `host=None` | 只按应用统计；不猜测域名 |
 | 设置值非法（语言/保留期/阈值等） | `Settings` 回落到默认值 | 无崩溃；下次写入可修正 |
 | 番茄持久化状态损坏 | `PomodoroState.from_dict` 回落到 `idle` | 当前番茄重置，不阻塞启动 |
-| 托盘/AppIndicator 不可用 | `Tray.available=False`，不创建 indicator | 仅窗口模式；关闭窗口默认隐藏，重新运行 `timebook` 可再次激活窗口 |
+| 托盘/AppIndicator 不可用 | `Tray.available=False`，不创建 indicator | 仅窗口模式；关闭窗口结账并退出 |
 | `notify-send` 不存在/失败 | 退化到 `GApplication.send_notification`；再失败只写日志 | 无桌面通知，其余功能正常 |
 | `widget-snapshot.json` 写入失败 | `OSError` 捕获，`log.debug` | 快照不更新，不影响主功能 |
 | `update-desktop-database` 缺失 | 安装脚本跳过刷新 | 桌面菜单可能延迟出现，重新登录后正常 |
@@ -245,3 +245,9 @@ FocusPage 按钮 / 快捷键 / 托盘
 - **新的提醒**：扩展 `RemindersEngine` / `LimitsEngine`，通过 `on_notify` 接线，不改 UI。
 - **新的快照读取方**：读取 `widget-snapshot.json` 即可，不需要链接任何库。
 - **新语言**：在 `core/l10n.py` 扩展 `VALID_LANGUAGES`，并用 `T(zh, en)` 覆盖文案；当前仅 zh/en。
+
+## 界面与集成验收
+
+`tests/test_regressions.py` 覆盖日期区间、采集状态转换、导出和番茄暂停边界；`tests/test_ui.py` 使用真实 GTK 控件和内存数据库；`tests/test_app_integration.py` 启动独立进程验证五个页面与退出。`scripts/check.py` 将编译检查、shell 语法和完整 unittest 串联，设置 `TIMEBOOK_REQUIRE_UI=1` 防止无显示器时静默跳过 GUI。
+
+`--no-track` 使用 `Gio.ApplicationFlags.NON_UNIQUE` 启动独立预览实例，不向运行中的用户窗口转发请求，也不写个人小组件快照；退出时仍关闭数据库连接。常规启动保持单实例行为。

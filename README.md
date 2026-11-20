@@ -14,7 +14,7 @@
 | 功能 | 说明 |
 |---|---|
 | **屏幕时间** | 每 2 秒采样前台窗口，按「应用 + 站点」切段落库；空闲、锁屏、暂停、排除应用都不计时，所以「没有记录 == 不在用电脑」。 |
-| **番茄钟** | 经典 25/5、冲刺 15/3、深度 50/10、自定义 30/5 四组预设；支持暂停/继续、跳过、自动开始休息/下一轮，以及 20 秒全屏微休息遮罩。 |
+| **番茄钟** | 默认经典 40/5、冲刺 15/3、深度 50/10、自定义 30/5 四组预设；支持暂停/继续、跳过、自动开始休息/下一轮，以及 20 秒全屏微休息遮罩。 |
 | **疲劳等级** | 按今日累计屏幕时间分 L1–L10 十级（清醒 → 躺平），每级有独立配色与提示文案，并显示距下一级还差多久。 |
 | **统计与热力图** | 最近 7/30 天切换：区间合计、活跃天日均、活跃天数、每日趋势柱状图、分类环形图、最近 12 周 7 档热力图。 |
 | **时间线** | 当日分段列表：起止时间、时长、应用、窗口标题（可选采集）、域名标签（按分类着色）。 |
@@ -23,7 +23,7 @@
 | **喝水** | 默认每日 8 杯目标，9:00–22:00 每 60 分钟提醒；专注页/托盘可快捷 +1 杯。 |
 | **双语** | 跟随系统语言（`LANG` / `LC_ALL`）或手动选择「自动 / 中文 / English」；番茄阶段、通知、导出周报、导航等关键文案已双语。 |
 | **导出** | 一键导出当日 CSV 明细 + Markdown 周报到下载目录（默认 `~/Downloads`，遵循 XDG）；CSV 带 UTF-8 BOM，Excel 双击不乱码。 |
-| **托盘** | StatusNotifierItem（D-Bus）：实时显示今日时长/番茄倒计时/暂停标记，菜单可打开窗口、暂停记录、+1 杯水、退出；没有 AppIndicator 时自动降级为纯窗口模式。 |
+| **托盘** | StatusNotifierItem（D-Bus）：实时显示今日时长/番茄倒计时/暂停标记，菜单可打开窗口、开始/暂停/继续番茄钟、暂停记录、+1 杯水、退出；没有 AppIndicator 时自动降级为纯窗口模式。 |
 
 ---
 
@@ -36,7 +36,7 @@
 - **GTK4 + libadwaita**：GNOME 原生外观与交互，自动跟随系统深浅色、高 DPI 与无障碍设置；`Adw.ApplicationWindow` / `Adw.PreferencesPage` 与 macOS 版的信息层级一一对应。
 - **Python + PyGObject**：只用标准库（`sqlite3`、`ctypes`、`argparse`、`logging`）和系统 PyGObject，**零 pip 第三方依赖**，打包就是一个目录 + 一个启动器。
 - **纯本地**：不引入任何 WebView、账号、云同步或分析 SDK；数据库是单文件 SQLite，拷贝即备份。
-- **绘图用 cairo + Pango**：环、柱状图、热力图、24 格全部直接绘制，中文字体走系统字体回退。
+- **绘图用 cairo + Pango**：环、柱状图、热力图使用 cairo；24 小时格使用可键盘操作的 GTK 按钮，中文字体走系统字体回退。
 
 ### 能力对应关系
 
@@ -117,7 +117,7 @@ python3 -m timebook.main --page stats
 
 **暂停**：顶栏「暂停记录」按钮（或托盘菜单）立即停止采集，当前段会结账；暂停期间不产生任何数据。
 
-**托盘**：标签位显示今日时长（番茄运行时显示倒计时），菜单可打开窗口、暂停、+1 杯水、退出。关闭窗口默认只是隐藏，采集继续。
+**托盘**：标签位显示今日时长（番茄运行时显示倒计时），菜单可打开窗口、开始/暂停/继续番茄钟、暂停记录、+1 杯水、退出。托盘可用时关闭窗口会隐藏并继续采集；托盘不可用时关闭窗口会退出。
 
 **导出**：顶栏保存按钮 → 当日 `timebook-detail-<时间戳>.csv` + `timebook-weekly-<时间戳>.md`，默认写入 `~/Downloads`（若系统设置了 XDG 下载目录则以它为准），并可直接打开所在文件夹。
 
@@ -160,7 +160,7 @@ python3 -m timebook.main --db /tmp/timebook-demo.db
 ## 已知限制 / Known limitations
 
 1. **Wayland 采集受限**：X11 接口只能看到 XWayland 窗口，原生 Wayland 应用无法被枚举。需要完整采集时请使用 X11 会话，或在 Wayland 下让程序走 XWayland：`GDK_BACKEND=x11 timebook`。此时空闲/锁屏检测依赖 `libXss` 与 XWayland 的行为，可能不如原生 X11 精确。
-2. **GNOME 托盘需要扩展**：GNOME Shell 默认不显示 AppIndicator，请安装并启用 `gnome-shell-extension-appindicator`（Fedora 包名 `gnome-shell-extension-appindicator`，Debian 包名 `gnome-shell-extension-appindicator`）。没有扩展时程序自动降级为纯窗口模式（关闭窗口会隐藏，再次运行 `timebook` 可重新唤起），其余功能不受影响。
+2. **GNOME 托盘需要扩展**：GNOME Shell 默认不显示 AppIndicator，请安装并启用 `gnome-shell-extension-appindicator`（Fedora 包名 `gnome-shell-extension-appindicator`，Debian 包名 `gnome-shell-extension-appindicator`）。没有扩展时程序自动降级为纯窗口模式（关闭窗口会正常退出），其余功能不受影响。
 3. **域名推断不如 AppleScript 精确**：无法读取真实 URL，只能从窗口标题匹配内置站点表或域名形态；标题不含域名时该段只按应用统计。
 4. **限额是提醒而非强制**：Linux 桌面没有系统级「应用限额」授权，Timebook 只发通知，不阻止你继续使用。
 5. 托盘/通知/图标主题由桌面环境决定；少数精简桌面可能没有通知守护进程或 AppIndicator。
@@ -174,8 +174,14 @@ python3 -m timebook.main --db /tmp/timebook-demo.db
 # 语法编译检查
 python3 -m compileall -q timebook
 
-# 单元测试（unittest，无第三方依赖）
+# 全套 unittest（无 GTK/显示器时会跳过 UI 测试）
 python3 -m unittest discover -s tests -v
+
+# 完整验收：要求 GTK 和显示器，不能用跳过 UI 测试来通过
+python3 scripts/check.py
+
+# 完整验收并截图：X11 + ImageMagick import
+python3 scripts/check.py --screenshots /tmp/timebook-ui
 
 # 直接跑（不安装）
 python3 -m timebook.main
@@ -183,6 +189,8 @@ python3 -m timebook.main
 # 生成演示数据
 python3 scripts/demo_seed.py --db /tmp/timebook-demo.db --days 14
 ```
+
+测试覆盖与验收记录见 [测试说明](docs/testing.md)。新增测试使用内存/临时数据库，不读取个人使用记录。
 
 设计说明见 [UI 规范（Linux）](docs/ui-spec-linux.md) 与 [架构文档](docs/architecture.md)；安装与桌面集成见 [`install.sh`](install.sh)、[`packaging/`](packaging/)。
 

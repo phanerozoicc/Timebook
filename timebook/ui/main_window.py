@@ -37,12 +37,12 @@ class MainWindow(Adw.ApplicationWindow):
         super().__init__(application=app)
         self._ctx = ctx
         self._lang = self._current_lang()
-        self.set_title("时账 Timebook")
+        W.translated(self, title=('时账 Timebook', 'Timebook'))
         self.set_default_size(1020, 720)
         self.set_size_request(860, 600)
         self.add_css_class("tb-window")
 
-        self._pages: dict[str, object] = {}
+        self._settings_window = None
         self._nav_rows: dict[str, Gtk.ListBoxRow] = {}
 
         root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -50,24 +50,28 @@ class MainWindow(Adw.ApplicationWindow):
         # ---- 顶栏 ----
         header = Gtk.HeaderBar()
         header.set_show_title_buttons(True)
-        self.page_title = Gtk.Label(label="今日")
+        self.page_title = W.translated(Gtk.Label(), label=('今日', 'Today'))
         self.page_title.add_css_class("tb-page-title")
         header.set_title_widget(self.page_title)
 
-        self.pause_button = Gtk.ToggleButton(label="暂停记录")
+        self.pause_button = W.translated(Gtk.ToggleButton(), label=('暂停记录', 'Pause tracking'))
         self.pause_button.add_css_class("tb-ghost")
         self.pause_button.connect("toggled", self._on_pause_toggled)
         header.pack_end(self.pause_button)
 
         settings_button = Gtk.Button()
         settings_button.set_icon_name("emblem-system-symbolic")
-        settings_button.set_tooltip_text("设置")
+        W.translated(settings_button, tooltip_text=("设置", "Settings"))
+        settings_button.add_css_class("tb-icon-button")
+        W.translated(settings_button, accessible=("设置", "Settings"))
         settings_button.connect("clicked", lambda _b: self._open_settings())
         header.pack_end(settings_button)
 
         export_button = Gtk.Button()
         export_button.set_icon_name("document-save-symbolic")
-        export_button.set_tooltip_text("导出")
+        W.translated(export_button, tooltip_text=("导出 CSV 与周报", "Export CSV and weekly report"))
+        export_button.add_css_class("tb-icon-button")
+        W.translated(export_button, accessible=("导出数据", "Export data"))
         export_button.connect("clicked", lambda _b: self._open_export())
         header.pack_end(export_button)
         root.append(header)
@@ -78,7 +82,8 @@ class MainWindow(Adw.ApplicationWindow):
 
         sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         sidebar.add_css_class("tb-sidebar")
-        sidebar.set_size_request(222, -1)
+        sidebar.set_size_request(200, -1)
+        sidebar.set_hexpand(False)
         body.append(sidebar)
 
         # 品牌头
@@ -90,8 +95,8 @@ class MainWindow(Adw.ApplicationWindow):
         logo = self._brand_logo()
         brand.append(logo)
         brand_text = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-        brand_text.append(W.label("时账", "tb-brand-name"))
-        brand_text.append(W.label("Timebook · 本地优先", "tb-brand-sub"))
+        brand_text.append(W.label(('时账', 'Timebook'), "tb-brand-name"))
+        brand_text.append(W.label(('Timebook · 本地优先', 'Local first'), "tb-brand-sub"))
         brand.append(brand_text)
         sidebar.append(brand)
 
@@ -112,14 +117,14 @@ class MainWindow(Adw.ApplicationWindow):
             image = Gtk.Image.new_from_icon_name(icon_name)
             image.set_pixel_size(17)
             box.append(image)
-            box.append(W.label(zh if self._lang == "zh" else en, "tb-nav-label"))
+            box.append(W.label((zh, en), "tb-nav-label"))
             row.set_child(box)
-            row.set_tooltip_text(f"{zh} · Ctrl+{index + 1}")
+            W.translated(row, tooltip_text=(f"{zh} · Ctrl+{index + 1}", f"{en} · Ctrl+{index + 1}"))
             self.nav.append(row)
             self._nav_rows[key] = row
         sidebar.append(self.nav)
 
-        sidebar.append(W.spacer())
+        sidebar.append(W.spacer(vertical=True))
 
         # 底部迷你卡
         mini = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
@@ -127,10 +132,10 @@ class MainWindow(Adw.ApplicationWindow):
         mini.set_margin_start(12)
         mini.set_margin_end(12)
         mini.set_margin_bottom(12)
-        mini.append(W.label("今日合计", "tb-caption"))
-        self.mini_value = W.label("0m", "tb-mini-value tb-mono")
+        mini.append(W.label(('今日合计', "Today's total"), "tb-caption"))
+        self.mini_value = W.label(models.fmt_duration(0, compact=True), "tb-mini-value tb-mono")
         mini.append(self.mini_value)
-        self.mini_level = W.label("L1 清醒", "tb-caption")
+        self.mini_level = W.label(('L1 清醒', 'L1 Fresh'), "tb-caption")
         mini.append(self.mini_level)
         sidebar.append(mini)
 
@@ -147,12 +152,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.stack.add_named(StatsPage(ctx), "stats")
         self.stack.add_named(TimelinePage(ctx), "timeline")
         self.stack.add_named(ForfeitPage(ctx), "forfeit")
-        for key in self._pages_map():
-            pass
         content.append(self.stack)
         body.append(content)
         root.append(body)
-        self.set_content(root)
+        self._toast_overlay = Adw.ToastOverlay()
+        self._toast_overlay.set_child(root)
+        self.set_content(self._toast_overlay)
 
         # 快捷键 Ctrl+1..5
         controller = Gtk.EventControllerKey()
@@ -162,12 +167,9 @@ class MainWindow(Adw.ApplicationWindow):
         # 默认选中今日
         self.nav.select_row(self._nav_rows["today"])
 
-        self.connect("close-request", self._on_close)
+        self.refresh(force=True)
 
     # ------------------------------------------------------------------ #
-
-    def _pages_map(self):
-        return [self.stack.get_child_by_name(key) for key, *_ in PAGES]
 
     def _current_lang(self) -> str:
         from ..core.l10n import resolved_language
@@ -229,33 +231,40 @@ class MainWindow(Adw.ApplicationWindow):
         paused = button.get_active()
         self._ctx.settings.paused = paused
         self._ctx.tracker.force_close()
-        button.set_label("继续记录" if paused else "暂停记录")
+        button.set_label(T("继续记录", "Resume tracking") if paused else T("暂停记录", "Pause tracking"))
         self.refresh(force=True)
 
     def _open_settings(self) -> None:
         from .settings_window import SettingsWindow
 
-        SettingsWindow(self, self._ctx).present()
+        if self._settings_window is None:
+            self._settings_window = SettingsWindow(self, self._ctx)
+            self._settings_window.set_hide_on_close(True)
+        self._settings_window.reload()
+        self._settings_window.present()
 
     def _open_export(self) -> None:
         from .export_dialog import extract_to_downloads
 
         extract_to_downloads(self, self._ctx)
 
-    def _on_close(self, *_args) -> bool:
-        # 关窗只是藏起来：托盘常驻，采集继续
-        self.set_visible(False)
-        return True
-
-    # ------------------------------------------------------------------ #
-
     def refresh(self, force: bool = False) -> None:
+        language = self._current_lang()
+        if language != self._lang:
+            self._lang = language
+            W.refresh_translations(self)
+            for key, *_ in PAGES:
+                self.stack.get_child_by_name(key).refresh(force=True)
+            self._on_nav(self.nav, self.nav.get_selected_row())
+            if self._settings_window is not None:
+                self._settings_window.refresh_language()
         paused = self._ctx.settings.paused
+        self.pause_button.set_label(T("继续记录", "Resume tracking") if paused else T("暂停记录", "Pause tracking"))
         if self.pause_button.get_active() != paused:
             self.pause_button.handler_block_by_func(self._on_pause_toggled)
             self.pause_button.set_active(paused)
             self.pause_button.handler_unblock_by_func(self._on_pause_toggled)
-            self.pause_button.set_label("继续记录" if paused else "暂停记录")
+            self.pause_button.set_label(T("继续记录", "Resume tracking") if paused else T("暂停记录", "Pause tracking"))
 
         total = self._ctx.today_total()
         self.mini_value.set_text(models.fmt_duration(total, compact=True))
@@ -278,4 +287,5 @@ class MainWindow(Adw.ApplicationWindow):
     def show_page(self, key: str) -> None:
         if key in self._nav_rows:
             self.nav.select_row(self._nav_rows[key])
+            self.refresh(force=True)
             self.present()

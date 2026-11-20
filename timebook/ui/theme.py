@@ -28,7 +28,7 @@ AMBER = 0xF5A524
 PAD = 24
 GAP = 16
 GAP_SMALL = 10
-RADIUS = 16
+RADIUS = 14
 
 #: 分类 9 色（与 Categories.swift 一致）
 CATEGORY_COLORS = {c.id: c.hex_color for c in CATEGORIES}
@@ -81,129 +81,106 @@ def mix(a: int, b: int, t: float) -> int:
 # --------------------------------------------------------------------------- #
 
 CSS = f"""
-/* ---------- 基础 ---------- */
 window.tb-window {{ background: @window_bg_color; }}
-
 .tb-sidebar {{
     background: alpha(@window_fg_color, 0.025);
-    border-right: 1px solid alpha(@window_fg_color, 0.07);
+    border-right: 1px solid alpha(@window_fg_color, 0.08);
 }}
-
-/* ---------- 侧边栏 ---------- */
-.tb-brand-name {{ font-size: 19px; font-weight: 800; color: {css_hex(BRAND)}; }}
-.tb-brand-sub {{ font-size: 11px; color: alpha(@window_fg_color, 0.55); }}
-.tb-nav-row {{ border-radius: 12px; padding: 2px 6px; margin: 1px 8px; }}
-.tb-nav-row:hover {{ background: alpha(@window_fg_color, 0.06); }}
-.tb-nav-row:selected {{ background: {css_rgba(BRAND, 0.16)}; }}
-.tb-nav-row:selected label {{ color: {css_hex(BRAND)}; font-weight: 700; }}
-.tb-nav-row:selected image {{ color: {css_hex(BRAND)}; }}
+.tb-brand-name {{ font-size: 19px; font-weight: 700; }}
+.tb-brand-sub {{ font-size: 12px; color: alpha(@window_fg_color, 0.72); }}
+.tb-nav-row {{ border-radius: 10px; padding: 4px 6px; margin: 2px 8px; }}
+.tb-nav-row:hover {{ background: alpha(@window_fg_color, 0.05); }}
+.tb-nav-row:selected {{ background: alpha(@tb_accent, 0.12); }}
+.tb-nav-row:selected label, .tb-nav-row:selected image {{ color: @tb_accent; font-weight: 600; }}
 .tb-nav-label {{ font-size: 14px; }}
-
 .tb-mini-card {{
-    background: alpha(@window_fg_color, 0.05);
-    border: 1px solid alpha(@window_fg_color, 0.07);
-    border-radius: 14px;
-    padding: 12px 14px;
+    background: @card_bg_color;
+    border: 1px solid alpha(@window_fg_color, 0.08);
+    border-radius: 12px; padding: 14px;
 }}
-.tb-mini-value {{ font-size: 22px; font-weight: 800; color: {css_hex(BRAND)}; }}
-
-/* ---------- 卡片 ---------- */
+.tb-mini-value {{ font-size: 24px; font-weight: 600; }}
 .tb-card {{
-    background: alpha(@window_fg_color, 0.045);
-    border: 1px solid alpha(@window_fg_color, 0.07);
-    border-radius: {RADIUS}px;
-    padding: {GAP}px;
+    background: @card_bg_color;
+    border: 1px solid alpha(@window_fg_color, 0.08);
+    border-radius: {RADIUS}px; padding: 18px;
 }}
-.tb-card:hover {{ background: alpha(@window_fg_color, 0.06); }}
-
+.tb-stat-card {{ padding: 14px; }}
 .tb-hero {{
-    background: linear-gradient(135deg, {css_rgba(BRAND, 0.17)}, {css_rgba(BRAND_SOFT, 0.05)} 60%,
-                alpha(@window_fg_color, 0.02));
-    border: 1px solid {css_rgba(BRAND, 0.22)};
-    border-radius: {RADIUS}px;
-    padding: 20px 22px;
+    background: @card_bg_color;
+    border: 1px solid alpha(@tb_accent, 0.22);
+    border-radius: {RADIUS}px; padding: 24px;
 }}
-
-/* ---------- 字阶 ---------- */
-.tb-hero-number {{ font-size: 46px; font-weight: 800; letter-spacing: -1px; }}
-.tb-card-value {{ font-size: 22px; font-weight: 800; }}
-.tb-page-title {{ font-size: 19px; font-weight: 800; }}
-.tb-section {{ font-size: 13px; font-weight: 700; color: alpha(@window_fg_color, 0.72); }}
-.tb-caption {{ font-size: 11px; color: alpha(@window_fg_color, 0.55); }}
-.tb-muted {{ color: alpha(@window_fg_color, 0.55); }}
+.tb-hero-number {{ font-size: 44px; font-weight: 600; letter-spacing: -1px; }}
+.tb-card-value {{ font-size: 22px; font-weight: 600; }}
+.tb-page-title {{ font-size: 16px; font-weight: 600; }}
+.tb-section {{ font-size: 14px; font-weight: 600; }}
+.tb-caption, .tb-muted {{ color: alpha(@window_fg_color, 0.72); }}
+.tb-caption {{ font-size: 12px; }}
 .tb-mono {{ font-feature-settings: "tnum" 1; }}
-
-/* ---------- 控件 ---------- */
-.tb-pill {{
-    border-radius: 999px;
-    padding: 4px 11px;
-    font-size: 11px;
-    font-weight: 700;
-    background: alpha(@window_fg_color, 0.08);
-}}
-.tb-badge {{
-    border-radius: 999px;
-    padding: 2px 9px;
-    font-size: 10px;
-    font-weight: 800;
-}}
+.tb-timer {{ font-size: 38px; font-weight: 600; }}
+.tb-chart-total {{ font-size: 22px; font-weight: 600; }}
+.tb-pill {{ border-radius: 8px; padding: 4px 10px; font-size: 12px; background: alpha(@window_fg_color, 0.06); }}
+.tb-badge {{ border-radius: 8px; padding: 3px 9px; font-size: 12px; font-weight: 600; }}
 .tb-primary {{
-    background: {css_hex(BRAND)};
-    color: #FFFFFF;
-    border-radius: 10px;
-    font-weight: 700;
-    padding: 8px 16px;
-    border: none;
+    background: #BC4325; color: #FFFFFF; border-radius: 10px;
+    font-weight: 600; padding: 8px 20px; min-height: 28px; border: none;
 }}
-.tb-primary:hover {{ background: {css_hex(BRAND_DEEP)}; }}
-.tb-primary:disabled {{ background: alpha(@window_fg_color, 0.12); color: alpha(@window_fg_color, 0.4); }}
-
+.tb-primary:hover {{ background: #A83C21; }}
+.tb-primary:active {{ background: #92321B; }}
+.tb-primary:disabled {{ background: alpha(@window_fg_color, 0.10); color: alpha(@window_fg_color, 0.4); }}
 .tb-ghost {{
-    background: alpha(@window_fg_color, 0.06);
-    border: 1px solid alpha(@window_fg_color, 0.09);
-    border-radius: 10px;
-    padding: 6px 12px;
-    font-weight: 600;
+    background: alpha(@window_fg_color, 0.04);
+    border: 1px solid alpha(@window_fg_color, 0.12);
+    border-radius: 10px; padding: 7px 12px; min-height: 28px; font-weight: 500;
 }}
-.tb-ghost:hover {{ background: alpha(@window_fg_color, 0.1); }}
-
-.tb-seg {{ background: alpha(@window_fg_color, 0.06); border-radius: 10px; padding: 3px; }}
-.tb-seg > button {{ border-radius: 8px; padding: 5px 14px; background: transparent; border: none; }}
-.tb-seg > button:checked {{ background: {css_rgba(BRAND, 0.22)}; color: {css_hex(BRAND)}; font-weight: 700; }}
-
-/* ---------- 列表 ---------- */
-.tb-row {{ padding: 10px 12px; border-radius: 10px; }}
-.tb-row:hover {{ background: alpha(@window_fg_color, 0.05); }}
-.tb-row + .tb-row {{ border-top: 1px solid alpha(@window_fg_color, 0.05); }}
-
-/* ---------- 遮罩 ---------- */
-.tb-overlay {{
-    background: linear-gradient(160deg, #10131A, #1B2430 60%, #16241F);
-}}
-.tb-overlay-title {{ font-size: 26px; font-weight: 800; color: #FFFFFF; }}
-.tb-overlay-body {{ font-size: 15px; color: alpha(#FFFFFF, 0.75); }}
-.tb-overlay-count {{ font-size: 84px; font-weight: 800; color: #6FAF8C; }}
-
-/* ---------- 滚动条 ---------- */
-scrolledwindow undershoot, scrolledwindow overshoot {{ background: transparent; }}
+.tb-ghost:hover {{ background: alpha(@window_fg_color, 0.08); }}
+.tb-ghost:active {{ background: alpha(@window_fg_color, 0.12); }}
+.tb-ghost:checked {{ background: alpha(@tb_accent, 0.12); color: @tb_accent; border-color: alpha(@tb_accent, 0.4); }}
+.tb-ghost:disabled {{ color: alpha(@window_fg_color, 0.35); }}
+.tb-icon-button {{ min-height: 40px; min-width: 40px; padding: 2px; }}
+.tb-seg {{ background: alpha(@window_fg_color, 0.04); border-radius: 10px; padding: 3px; }}
+.tb-seg > button {{ border-radius: 8px; padding: 7px 14px; min-height: 28px; background: transparent; border: none; }}
+.tb-seg > button:checked {{ background: @card_bg_color; color: @tb_accent; font-weight: 600; }}
+.tb-row {{ padding: 12px 4px; }}
+.tb-row + .tb-row {{ border-top: 1px solid alpha(@window_fg_color, 0.07); }}
+.tb-rows {{ min-height: 30px; }}
+.tb-hour {{ border-radius: 8px; min-height: 44px; min-width: 44px; padding: 4px; background: alpha(@window_fg_color, 0.04); }}
+.tb-hour:checked {{ background: alpha(@tb_accent, 0.15); color: @tb_accent; }}
+.tb-hour.current {{ outline: 2px solid @tb_accent; outline-offset: -2px; }}
+.tb-error {{ color: @error_color; font-size: 12px; }}
+.tb-overlay {{ background: #18211E; color: #FFFFFF; }}
+.tb-overlay .tb-timer {{ font-size: 64px; color: #FFFFFF; }}
+.tb-overlay .tb-caption {{ color: alpha(#FFFFFF, 0.78); }}
+.tb-overlay .tb-ghost {{ color: #FFFFFF; background: alpha(#FFFFFF, 0.1); border-color: alpha(#FFFFFF, 0.3); }}
+.tb-overlay-title {{ font-size: 26px; font-weight: 600; color: #FFFFFF; }}
+.tb-overlay-body {{ font-size: 15px; color: alpha(#FFFFFF, 0.78); }}
 """
+
+_providers = {}
 
 
 def install_css(display=None) -> None:
-    """把设计系统挂到当前 display（幂等）。"""
+    """Install once per display; update semantic colors when the system theme changes."""
     import gi
 
     gi.require_version("Gdk", "4.0")
-    from gi.repository import Gdk, Gtk
+    gi.require_version("Adw", "1")
+    from gi.repository import Adw, Gdk, Gtk
 
-    provider = Gtk.CssProvider()
-    provider.load_from_data(CSS.encode("utf-8"))
     target = display or Gdk.Display.get_default()
-    if target is None:  # pragma: no cover - 无显示环境
+    if target is None or target in _providers:
         return
-    Gtk.StyleContext.add_provider_for_display(
-        target, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-    )
+    provider = Gtk.CssProvider()
+    manager = Adw.StyleManager.get_for_display(target)
+
+    def reload(*_args):
+        accent = "#FF9D80" if manager.get_dark() else "#AC3D22"
+        provider.load_from_data((f"@define-color tb_accent {accent};\n" + CSS).encode())
+
+    reload()
+    manager.connect("notify::dark", reload)
+    Gtk.StyleContext.add_provider_for_display(target, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+    _providers[target] = provider
 
 
 # 单色 SVG 图标（24×24，currentColor 由 GTK 着色）

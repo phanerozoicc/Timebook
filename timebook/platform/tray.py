@@ -7,7 +7,7 @@ Python 的 GObject 内省不允许同一进程里同时加载 Gtk 3.0 和 4.0。
 * ``org.kde.StatusNotifierItem`` —— 图标 + 提示 + 标签（``XAyatanaLabel``，
   Ubuntu/GNOME AppIndicator 扩展会读它显示文字，也就还原了 macOS 版菜单栏
   的「今日时长 / 番茄倒计时」）。
-* ``com.canonical.dbusmenu`` —— 下拉菜单（打开窗口 / 暂停 / +1 杯水 /
+* ``com.canonical.dbusmenu`` —— 下拉菜单（打开窗口 / 番茄钟 / 暂停 / +1 杯水 /
   微休息 / 退出）。
 * 图标用 cairo 现场绘制成 ARGB32 位图（``IconPixmap``），不依赖主题里是否
   装了 timebook 图标。
@@ -19,6 +19,8 @@ Python 的 GObject 内省不允许同一进程里同时加载 Gtk 3.0 和 4.0。
 from __future__ import annotations
 
 import logging
+
+from ..core.l10n import T, resolved_language
 import os
 
 log = logging.getLogger("timebook.tray")
@@ -38,6 +40,7 @@ MENU_LAYOUT = [
     (2, "label", "status", False),
     (3, "separator", None, True),
     (4, "action", "open", True),
+    (10, "action", "pomodoro", True),
     (5, "action", "pause", True),
     (6, "action", "water", True),
     (7, "action", "break", True),
@@ -108,6 +111,7 @@ class Tray:
         self._label = ""
         self._tooltip = ""
         self._status_line = ""
+        self._pomodoro_text = ""
         self._bus = None
         self._bus_name = None
         self._service_name = ""
@@ -262,7 +266,25 @@ class Tray:
         return [0] + [item[0] for item in MENU_LAYOUT]
 
     def _menu_text(self, key: str) -> str:
-        from ..core.l10n import T
+        from ..core.l10n import T, resolved_language
+
+        if key == "pomodoro":
+            engine = self._ctx.pomodoro
+            state = engine.state
+            ready_phase = state.phase.ready_base
+            if ready_phase is not None:
+                return T(
+                    f"番茄钟：开始{ready_phase.label}",
+                    f"Pomodoro: start {ready_phase.label.lower()}",
+                )
+            if not state.phase.is_running:
+                return T(
+                    f"开始番茄钟（{engine.preset.work_min} 分钟）",
+                    f"Start pomodoro ({engine.preset.work_min} min)",
+                )
+            if state.paused:
+                return T("继续番茄钟", "Resume pomodoro")
+            return T("暂停番茄钟", "Pause pomodoro")
 
         texts = {
             "open": T("打开时账", "Open Timebook"),
@@ -375,6 +397,9 @@ class Tray:
                 continue
             if key == "open":
                 self._on_open()
+            elif key == "pomodoro":
+                self._ctx.pomodoro.toggle()
+                self.refresh(force=True)
             elif key == "pause":
                 self._toggle_pause()
             elif key == "water":
@@ -412,20 +437,27 @@ class Tray:
 
         total = self._ctx.today_total()
         if paused:
-            status = "记录已暂停"
+            status = T("记录已暂停", "Tracking paused")
         elif self._ctx.tracker.is_idle:
-            status = "空闲中"
+            status = T("空闲中", "Idle")
         else:
             current = self._ctx.tracker.current_app_name
-            status = f"当前：{current}" if current else "当前：—"
+            status = T(f"当前：{current or '—'}", f"Current: {current or '—'}")
 
+        changed_status = status != self._status_line
+        language = resolved_language()
+        changed_language = language != getattr(self, "_language", None)
+        self._language = language
         changed_label = label != self._label
+        pomodoro_text = self._menu_text("pomodoro")
+        changed_pomodoro = pomodoro_text != self._pomodoro_text
+        self._pomodoro_text = pomodoro_text
         self._label = label
         self._status_line = status
-        self._tooltip = f"今日 {fmt_duration(total)}"
+        self._tooltip = T(f"今日 {fmt_duration(total)}", f"Today {fmt_duration(total)}")
         if not self.available or self._item is None:
             return
-        if not changed_label and not force:
+        if not (changed_label or changed_pomodoro or changed_status or changed_language or force):
             return
         try:
             self._item.NewLabel(label)

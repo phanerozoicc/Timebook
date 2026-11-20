@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 
 from .categories import BY_ID, OTHER, SiteCategory, for_host
@@ -128,6 +128,25 @@ def day_key(dt: datetime | None = None) -> str:
 # --------------------------------------------------------------------------- #
 
 
+def clipped_rows(rows, start: datetime, end: datetime) -> list[EventRow]:
+    """Return only the part of each event inside the half-open interval."""
+    return [
+        replace(row, start=max(row.start, start), end=min(row.end, end))
+        for row in rows if row.end > start and row.start < end and end > start
+        and row.duration > 0
+    ]
+
+
+def daily_parts(rows):
+    """Split events at local midnight so every dashboard uses the same totals."""
+    for row in rows:
+        cursor = row.start
+        while cursor < row.end:
+            end = min(row.end, today_start(cursor) + timedelta(days=1))
+            yield replace(row, start=cursor, end=end)
+            cursor = end
+
+
 def total(rows: list[EventRow] | tuple[EventRow, ...]) -> float:
     return float(sum(r.duration for r in rows))
 
@@ -199,7 +218,7 @@ def per_day(
     end_day = now.date()
     days = [end_day - timedelta(days=offset) for offset in range(count - 1, -1, -1)]
     buckets: dict[date, float] = {d: 0.0 for d in days}
-    for row in rows:
+    for row in daily_parts(rows):
         day = row.start.date()
         if day in buckets:
             buckets[day] += row.duration
@@ -218,7 +237,7 @@ def stacked(
     end_day = now.date()
     days = [end_day - timedelta(days=offset) for offset in range(count - 1, -1, -1)]
     buckets: dict[date, dict[str, float]] = {d: {} for d in days}
-    for row in rows:
+    for row in daily_parts(rows):
         day = row.start.date()
         if day not in buckets:
             continue
@@ -252,7 +271,7 @@ def average_active_day(
 
 
 def day_total(rows: list[EventRow] | tuple[EventRow, ...], day: date) -> float:
-    return float(sum(r.duration for r in rows if r.start.date() == day))
+    return total(clipped_rows(rows, *day_bounds(day)))
 
 
 def top_app_name(rows: list[EventRow] | tuple[EventRow, ...]) -> str | None:
@@ -276,10 +295,10 @@ def fmt_duration(seconds: float, compact: bool = False) -> str:
     m, s = divmod(rem, 60)
     if compact:
         if h > 0:
-            return f"{h}h{m:02d}m"
+            return T(f"{h}时{m:02d}分", f"{h}h{m:02d}m")
         if m > 0:
-            return f"{m}m"
-        return f"{s}s"
+            return T(f"{m}分", f"{m}m")
+        return T(f"{s}秒", f"{s}s")
     if h > 0:
         return T(f"{h} 小时 {m} 分", f"{h}h {m}m")
     if m > 0:

@@ -13,7 +13,10 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gtk  # noqa: E402
 
-from ..core.exporter import export_csv, export_markdown  # noqa: E402
+from ..core.exporter import export_csv, weekly_markdown
+from ..core import models
+from . import widgets as W
+from datetime import timedelta  # noqa: E402
 
 
 def downloads_dir() -> Path:
@@ -38,23 +41,41 @@ def open_folder(path: Path) -> None:
         pass
 
 
-def extract_to_downloads(window, ctx) -> tuple[Path, Path]:
-    """写出两份文件，返回 (csv, md)。用 Toast 反馈结果。"""
+def extract_to_downloads(window, ctx) -> tuple[Path, Path] | None:
+    """Export a single live snapshot and show success or a recoverable error."""
     now = datetime.now()
     target_dir = downloads_dir()
-    target_dir.mkdir(parents=True, exist_ok=True)
-    stamp = now.strftime("%Y%m%d-%H%M")
-
-    rows = ctx.store.today_rows(now)
-    csv_path = target_dir / f"timebook-detail-{stamp}.csv"
-    count = export_csv(rows, csv_path)
-    md_path = target_dir / f"timebook-weekly-{stamp}.md"
-    export_markdown(ctx.store, md_path, now)
-
-    toast = Adw.Toast.new(f"已导出 {count} 行明细 + 周报 → {target_dir.name}/")
-    toast.set_button_label("打开文件夹")
-    toast.connect("button-clicked", lambda _t: open_folder(csv_path))
+    stamp = now.strftime("%Y%m%d-%H%M%S-%f")
     overlay = getattr(window, "_toast_overlay", None)
+    try:
+        target_dir.mkdir(parents=True, exist_ok=True)
+        rows = ctx.today_rows(now)
+        csv_path = target_dir / f"timebook-detail-{stamp}.csv"
+        count = export_csv(rows, csv_path)
+        start = models.today_start(now) - timedelta(days=6)
+        end = models.today_start(now) + timedelta(days=1)
+        week = ctx.rows(start, end, now)
+        focus = ctx.store.focus_events(start, end)
+        report = weekly_markdown(
+            now, models.per_day(week, now=now), models.by_app(week), models.by_host(week),
+            models.by_category(week), pomodoros=sum(f.completed for f in focus),
+            focus_seconds=sum(f.duration for f in focus if f.completed),
+            cups=ctx.cups(), goal_cups=ctx.settings.water_goal_cups,
+        )
+        md_path = target_dir / f"timebook-weekly-{stamp}.md"
+        md_path.write_text(report, encoding="utf-8")
+    except OSError:
+        if overlay is not None:
+            W.add_translated_toast(overlay, W.translated(Adw.Toast.new(""), title=(
+                "导出失败，请检查下载目录的写入权限或可用空间。",
+                "Export failed. Check Downloads permissions and available space.",
+            )))
+        return None
+
+    toast = W.translated(Adw.Toast.new(""),
+                         title=(f"已导出 {count} 行明细与周报", f"Exported {count} rows and weekly report"),
+                         button_label=("打开文件夹", "Open folder"))
+    toast.connect("button-clicked", lambda _t: open_folder(csv_path))
     if overlay is not None:
-        overlay.add_toast(toast)
+        W.add_translated_toast(overlay, toast)
     return csv_path, md_path

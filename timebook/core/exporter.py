@@ -14,6 +14,7 @@ from pathlib import Path
 from . import models
 from .brain_level import for_total
 from .l10n import T
+from .settings import Settings
 
 CSV_HEADER = ["start", "end", "duration_seconds", "app", "host", "detail", "title"]
 
@@ -40,9 +41,9 @@ def csv_text(rows) -> str:
 
 def export_csv(rows, path: str | Path) -> int:
     """写入 CSV，返回数据行数（不含表头）。"""
-    text = csv_text(rows)
-    Path(path).write_text(text, encoding="utf-8")
-    return max(0, text.count("\n") - 1)
+    rows = list(rows)
+    Path(path).write_text(csv_text(rows), encoding="utf-8")
+    return len(rows)
 
 
 def weekly_markdown(
@@ -70,12 +71,12 @@ def weekly_markdown(
     md = f"# {T('时账周报', 'Timebook Weekly')} ({week_start} ~ {today})\n\n"
     md += f"- {T('本周合计', 'Week total')}：{models.fmt_duration(total)}\n"
     brain_line = T("今日疲劳等级", "Today's brain level")
-    md += f"- {brain_line}：L{level.level} {level.name}（{level.label_en}）\n"
+    md += f"- {brain_line}：L{level.level} {level.name}\n"
     md += (
         f"- {T('本周番茄', 'Pomodoros this week')}：{pomodoros} 🍅"
         f"（{models.fmt_duration(focus_seconds)}）\n"
     )
-    md += f"- {T('本周喝水', 'Water today')}：{cups}/{goal_cups} 💧\n\n"
+    md += f"- {T('今日喝水', 'Water today')}：{cups}/{goal_cups} 💧\n\n"
 
     md += f"## {T('每日', 'Daily')}\n\n"
     md += f"| {T('日期', 'Date')} | {T('时长', 'Time')} |\n|---|---|\n"
@@ -83,11 +84,11 @@ def weekly_markdown(
         md += f"| {point.day.strftime('%Y-%m-%d')} | {models.fmt_duration(point.seconds)} |\n"
 
     if top_apps:
-        md += f"\n## {T('Top 应用', 'Top apps')}\n\n"
+        md += f"\n## {T('常用应用', 'Top apps')}\n\n"
         for app in list(top_apps)[:8]:
             md += f"- {app.name}：{models.fmt_duration(app.seconds)}\n"
     if top_hosts:
-        md += f"\n## {T('Top 网站', 'Top sites')}\n\n"
+        md += f"\n## {T('常用网站', 'Top sites')}\n\n"
         for host in list(top_hosts)[:8]:
             md += f"- {host.host}：{models.fmt_duration(host.seconds)}\n"
     if categories:
@@ -125,7 +126,7 @@ def build_weekly_markdown(store, now: datetime | None = None, days: int = 7) -> 
         pomodoros=pomodoros,
         focus_seconds=focus_seconds,
         cups=cups,
-        goal_cups=8,
+        goal_cups=Settings(store).water_goal_cups,
     )
 
 

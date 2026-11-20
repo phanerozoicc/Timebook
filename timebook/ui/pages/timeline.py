@@ -9,6 +9,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Pango  # noqa: E402
 
+from ...core.l10n import T
 from ...core import models  # noqa: E402
 from ...core.categories import for_host  # noqa: E402
 from .. import widgets as W  # noqa: E402
@@ -31,20 +32,21 @@ class TimelinePage(Page):
         self.list_card = W.card(2)
         self.rows_box = W.vbox(0)
         self.list_card.append(self.rows_box)
-        self.empty = W.EmptyState("document-open-recent-symbolic", "今天还没有记录。")
+        self.empty = W.EmptyState("document-open-recent-symbolic", ('今天还没有记录。', 'No activity today.'))
         self.list_card.append(self.empty)
         self.body.append(self.list_card)
 
         self._signature: tuple | None = None
 
     def refresh(self, force: bool = False) -> None:
+        force = self.refresh_language() or force
         now = datetime.now()
-        rows = self._ctx.store.today_rows(now)
+        rows = self._ctx.today_rows(now)
         rows = models.segments(rows)
         total = float(sum(r.duration for r in rows))
-        self.summary.set_text(f"今日 {len(rows)} 段 · 合计 {models.fmt_duration(total)}")
+        self.summary.set_text(T(f"今日 {len(rows)} 段 · 合计 {models.fmt_duration(total)}", f"Today: {len(rows)} segments · Total {models.fmt_duration(total)}"))
         self.capture_note.set_text(
-            "已开启窗口标题采集" if self._ctx.settings.capture_titles else "窗口标题采集已关闭（设置 → 记录）"
+            T("已开启窗口标题采集", "Window titles are recorded") if self._ctx.settings.capture_titles else T("窗口标题采集已关闭（设置 → 记录）", "Window titles are off (Settings → Tracking)")
         )
 
         signature = (len(rows), rows[0].start if rows else None, total)

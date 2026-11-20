@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Callable, Protocol
 
-from ..core.models import EventRow
+from ..core.models import EventRow, clipped_rows, today_start
 from ..core.settings import Settings
 from ..core.store import Store
 from .browsers import is_browser
@@ -106,7 +106,7 @@ class Tracker:
         # 2) 熄屏/锁屏：不记
         try:
             if self._x11.screensaver_active():
-                self._close_open(now, record=False)
+                self._close_open(self._last_tick or now, record=True)
                 self._idle = False
                 return
         except Exception:  # pragma: no cover
@@ -128,12 +128,19 @@ class Tracker:
             return
         self._idle = False
 
+        # Close at the last observed sample before a suspend/resume gap,
+        # before checking the newly focused app (which may have changed).
+        threshold = self._settings.idle_threshold
+        if self._last_tick and (now - self._last_tick).total_seconds() > max(threshold, 300) + 30:
+            self._close_open(self._last_tick, record=True)
+
         # 4) 前台窗口
         try:
             window = self._x11.active_window()
         except Exception:  # pragma: no cover
             window = None
         if window is None:
+            self._close_open(now, record=True)
             return
 
         app_id = (window.app_id or "").strip() or "unknown"
@@ -142,7 +149,7 @@ class Tracker:
         # 排除应用：完全不落库
         if app_id in self._settings.excluded or app_name in self._settings.excluded:
             if self._open is not None:
-                self._close_open(now, record=False)
+                self._close_open(now, record=self._open.app_id != app_id)
             return
 
         host = None
@@ -151,10 +158,6 @@ class Tracker:
             host = host_from_title(window.title or "")
         if self._settings.capture_titles and (window.title or "").strip():
             title = window.title.strip()
-
-        last_tick_gap = (
-            (now - self._last_tick).total_seconds() if self._last_tick is not None else 0.0
-        )
 
         if self._open is None:
             self._begin(OpenSegment(app_id, app_name, host, title, now))
@@ -172,10 +175,6 @@ class Tracker:
             self._open.title = title
         self._current = self._open
 
-        # 5) 休眠/挂起恢复后的大跳跃：丢弃这一段，避免一次记上几小时
-        if last_tick_gap > max(threshold, 300) + 30:
-            self._close_open(now, record=False)
-            self._begin(OpenSegment(app_id, app_name, host, title, now))
 
     # -- 段管理 ---------------------------------------------------------- #
 
@@ -191,6 +190,7 @@ class Tracker:
     def _close_open(self, end: datetime, record: bool) -> None:
         segment = self._open
         self._open = None
+        self._current = None
         if segment is None:
             return
         if record and end > segment.start:
@@ -237,15 +237,18 @@ class Tracker:
     def is_paused(self) -> bool:
         return self._settings.paused
 
+    def rows(self, start: datetime, end: datetime, now: datetime | None = None) -> list[EventRow]:
+        """A consistent snapshot, including the current uncommitted segment."""
+        now = now or self._now()
+        with self._lock:
+            rows = self._store.rows(start, end)
+            if self._open is not None and not self._settings.paused and not self._idle:
+                rows += clipped_rows([self._open.to_row(now)], start, end)
+            return sorted(rows, key=lambda row: row.start, reverse=True)
+
     def today_seconds(self, now: datetime | None = None) -> float:
         now = now or self._now()
-        rows = self._store.today_rows(now)
-        total = float(sum(r.duration for r in rows))
-        # 加上尚未结账的当前段，让菜单栏数字实时跳动
-        segment = self._open
-        if segment is not None and not self._settings.paused and not self._idle:
-            total += max(0.0, (now - segment.start).total_seconds())
-        return total
+        return sum(row.duration for row in self.rows(today_start(now), today_start(now) + timedelta(days=1), now))
 
     def snapshot(self, now: datetime | None = None) -> dict:
         now = now or self._now()

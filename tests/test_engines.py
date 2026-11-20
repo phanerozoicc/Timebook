@@ -59,8 +59,8 @@ class PomodoroEngineTests(unittest.TestCase):
         self.assertEqual(self.engine.state.phase, PomodoroPhase.IDLE)
         self.assertEqual(self.engine.remain, 0.0)
 
-    def test_presets_match_macos(self) -> None:
-        self.assertEqual(PRESETS["classic"].work_min, 25)
+    def test_preset_durations(self) -> None:
+        self.assertEqual(PRESETS["classic"].work_min, 40)
         self.assertEqual(PRESETS["sprint"].short_break_min, 3)
         self.assertEqual(PRESETS["deep"].long_break_min, 20)
         self.assertEqual(PRESETS["deep"].rounds, 3)
@@ -68,13 +68,16 @@ class PomodoroEngineTests(unittest.TestCase):
     def test_work_to_short_break(self) -> None:
         self.engine.start()
         self.assertEqual(self.engine.state.phase, PomodoroPhase.WORK)
-        self.assertAlmostEqual(self.engine.remain, 25 * 60, delta=1)
+        self.assertAlmostEqual(self.engine.remain, 40 * 60, delta=1)
         self.clock.advance(minutes=25)
+        self.engine.tick()
+        self.assertEqual(self.engine.state.phase, PomodoroPhase.WORK)
+        self.clock.advance(minutes=15)
         self.engine.tick()
         self.assertEqual(self.engine.state.phase, PomodoroPhase.SHORT, "工作结束后应进短休")
         self.assertEqual(len(self.segments), 1)
         self.assertTrue(self.segments[0].completed, "自然结束应记为已完成")
-        self.assertEqual(self.segments[0].duration, 25 * 60)
+        self.assertEqual(self.segments[0].duration, 40 * 60)
 
     def test_four_rounds_then_long_break_and_round_reset(self) -> None:
         preset = self.engine.preset
@@ -118,7 +121,7 @@ class PomodoroEngineTests(unittest.TestCase):
     def test_auto_start_breaks_off_goes_to_ready(self) -> None:
         self.engine.auto_start_breaks = False
         self.engine.start()
-        self.clock.advance(minutes=25)
+        self.clock.advance(minutes=40)
         self.engine.tick()
         self.assertEqual(self.engine.state.phase, PomodoroPhase.SHORT_READY)
         self.assertIsNone(self.engine.state.ends_at, "ready 阶段没有截止时间")
@@ -147,7 +150,7 @@ class PomodoroEngineTests(unittest.TestCase):
     def test_progress_bounds(self) -> None:
         self.engine.start()
         self.assertAlmostEqual(self.engine.progress, 0.0, places=2)
-        self.clock.advance(minutes=12, seconds=30)
+        self.clock.advance(minutes=20)
         self.engine.tick()
         self.assertGreater(self.engine.progress, 0.4)
         self.assertLessEqual(self.engine.progress, 1.0)
@@ -162,7 +165,7 @@ class PomodoroEngineTests(unittest.TestCase):
 
     def test_remain_clock_format(self) -> None:
         self.engine.start()
-        self.assertEqual(self.engine.remain_clock, "25:00")
+        self.assertEqual(self.engine.remain_clock, "40:00")
 
     def test_state_serialization_roundtrip(self) -> None:
         state = PomodoroState(phase=PomodoroPhase.LONG, round=3, paused=True, paused_remaining=42.0)

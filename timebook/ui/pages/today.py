@@ -9,6 +9,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Pango  # noqa: E402
 
+from ...core.l10n import T, date_label
 from ...core import models  # noqa: E402
 from ...core.brain_level import for_total, progress_to_next  # noqa: E402
 from ...core.categories import for_host  # noqa: E402
@@ -26,14 +27,14 @@ class TodayPage(Page):
         self.hero = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
         self.hero.add_css_class("tb-hero")
         head = W.hbox(8)
-        self.hero_caption = W.label("今日屏幕时间", "tb-caption")
+        self.hero_caption = W.label(('今日屏幕时间', "Today's screen time"), "tb-caption")
         head.append(self.hero_caption)
         head.append(W.spacer())
         self.hero_date = W.label("", "tb-caption tb-mono")
         head.append(self.hero_date)
         self.hero.append(head)
 
-        self.hero_number = W.label("0m", "tb-hero-number tb-mono")
+        self.hero_number = W.label(models.fmt_duration(0, compact=True), "tb-hero-number tb-mono")
         self.hero.append(self.hero_number)
 
         self.hero_sub = W.label("", "tb-caption")
@@ -49,7 +50,7 @@ class TodayPage(Page):
         self.level_badge = W.LevelBadge(for_total(0), 54)
         top.append(self.level_badge)
         text_box = W.vbox(2)
-        self.level_title = W.label("L1 清醒", "tb-card-value")
+        self.level_title = W.label(('L1 清醒', 'L1 Fresh'), "tb-card-value")
         text_box.append(self.level_title)
         self.level_message = W.label("", "tb-caption", wrap=True)
         text_box.append(self.level_message)
@@ -64,53 +65,58 @@ class TodayPage(Page):
 
         # ---- 三个条形区 ----
         self.category_card = W.card(8)
-        self.category_card.append(W.SectionHeader("view-grid-symbolic", "分类占比", ""))
+        self.category_card.append(W.SectionHeader("view-grid-symbolic", ('分类占比', 'Categories'), ""))
         self.category_rows = W.vbox(6)
         self.category_card.append(self.category_rows)
-        self.category_empty = W.EmptyState("view-grid-symbolic", "今天还没有浏览记录。")
+        self.category_empty = W.EmptyState("view-grid-symbolic", ('今天还没有浏览记录。', 'No browser activity today.'))
         self.category_card.append(self.category_empty)
         self.body.append(self.category_card)
 
         self.host_card = W.card(8)
-        self.host_card.append(W.SectionHeader("network-server-symbolic", "按网站", "仅浏览器"))
+        self.host_card.append(W.SectionHeader("network-server-symbolic", ('按网站', 'By website'), ('仅浏览器', 'Browser activity only')))
         self.host_rows = W.vbox(6)
         self.host_card.append(self.host_rows)
-        self.host_empty = W.EmptyState("network-server-symbolic", "还没有网站记录，去浏览器逛逛？")
+        self.host_empty = W.EmptyState("network-server-symbolic", ('还没有网站记录，去浏览器逛逛？', 'Website activity will appear here as you browse.'))
         self.host_card.append(self.host_empty)
         self.body.append(self.host_card)
 
         self.app_card = W.card(8)
-        self.app_card.append(W.SectionHeader("applications-system-symbolic", "按应用", ""))
+        self.app_card.append(W.SectionHeader("applications-system-symbolic", ('按应用', 'By app'), ""))
         self.app_rows = W.vbox(6)
         self.app_card.append(self.app_rows)
-        self.app_empty = W.EmptyState("applications-system-symbolic", "还没有应用记录。")
+        self.app_empty = W.EmptyState("applications-system-symbolic", ('还没有应用记录。', 'No app activity yet.'))
         self.app_card.append(self.app_empty)
         self.body.append(self.app_card)
 
     # ------------------------------------------------------------------ #
 
     def refresh(self, force: bool = False) -> None:
+        force = self.refresh_language() or force
         now = datetime.now()
-        rows = self._ctx.store.today_rows(now)
+        rows = self._ctx.today_rows(now)
         total = float(sum(r.duration for r in rows))
         live = self._ctx.today_total()
         total = max(total, live)
 
-        self.hero_date.set_text(now.strftime("%Y年%m月%d日" if self._zh() else "%a, %b %d"))
+        self.hero_date.set_text(date_label(now))
         self.hero_number.set_text(models.fmt_duration(total, compact=True))
+        settings = self._ctx.settings
+        self.hero_bar.set_visible(settings.limits_enabled)
+        self.hero_bar.set_fraction(total / (settings.limits_daily_minutes * 60))
+        self.hero_bar.set_tooltip_text(T(f"每日上限 · {models.fmt_duration(settings.limits_daily_minutes * 60)}", f"Daily limit · {models.fmt_duration(settings.limits_daily_minutes * 60)}"))
 
         yesterday = self._yesterday_total(now)
         if total <= 0:
-            self.hero_sub.set_text("开始工作后这里会实时累加。")
+            self.hero_sub.set_text(T('开始工作后这里会实时累加。', 'Your screen time updates here as you work.'))
         elif yesterday > 0:
             delta = total - yesterday
             pct = abs(delta) / yesterday * 100
             arrow = "↑" if delta > 0 else "↓"
             self.hero_sub.set_text(
-                f"比昨天同期 {arrow} {models.fmt_duration(abs(delta), compact=True)}（{pct:.0f}%）"
+                T(f"比昨天同期 {arrow} {models.fmt_duration(abs(delta), compact=True)}（{pct:.0f}%）", f"Since this time yesterday {arrow} {models.fmt_duration(abs(delta), compact=True)} ({pct:.0f}%)")
             )
         else:
-            self.hero_sub.set_text("昨天没有记录，今天是个新开始。")
+            self.hero_sub.set_text(T('昨天没有记录，今天是个新开始。', 'No activity yesterday. Today is a fresh start.'))
 
         level, nxt, ratio = progress_to_next(total)
         self.level_badge.set_level(level)
@@ -118,10 +124,10 @@ class TodayPage(Page):
         self.level_message.set_text(level.message)
         self.level_bar.set_fraction(ratio, LEVEL_COLORS.get(level.level, BRAND))
         if nxt is None:
-            self.level_next.set_text("已到最高级")
+            self.level_next.set_text(T('已到最高级', 'Highest level reached'))
         else:
             remain = max(0.0, nxt.min_hours * 3600 - total)
-            self.level_next.set_text(f"距 L{nxt.level} 还有 {models.fmt_duration(remain, compact=True)}")
+            self.level_next.set_text(T(f"距 L{nxt.level} 还有 {models.fmt_duration(remain, compact=True)}", f"{models.fmt_duration(remain, compact=True)} until L{nxt.level}"))
 
         signature = (total, len(rows))
         if not force and signature == self._last_rows_signature:
@@ -164,11 +170,7 @@ class TodayPage(Page):
         """昨天同一时刻之前（同期）的累计时长，用于「比昨天」对比。"""
         day = now.date() - timedelta(days=1)
         start = datetime(day.year, day.month, day.day)
-        cutoff = datetime(day.year, day.month, day.day, now.hour, now.minute)
-        rows = self._ctx.store.rows(start, cutoff)
+        cutoff = now - timedelta(days=1)
+        rows = self._ctx.rows(start, cutoff)
         return float(sum(r.duration for r in rows))
 
-    def _zh(self) -> bool:
-        from ...core.l10n import resolved_language
-
-        return resolved_language() == "zh"

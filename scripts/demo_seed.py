@@ -77,7 +77,7 @@ def seed(db_path: str, days: int = 14, seed_value: int = 7, reset: bool = True) 
         # 番茄记录
         for _ in range(rng.randint(0, 5)):
             start = day + timedelta(hours=rng.randint(9, 18), minutes=rng.randint(0, 50))
-            store.record_focus(start, start + timedelta(minutes=25), rng.random() < 0.85, "classic")
+            store.record_focus(start, start + timedelta(minutes=40), rng.random() < 0.85, "classic")
         # 喝水（每天一行）
         cups = rng.randint(2, 8)
         store.add_cup(cups, now=day + timedelta(hours=20))

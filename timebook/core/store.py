@@ -20,7 +20,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterable
 
-from .models import EventRow, FocusRow
+from .models import EventRow, FocusRow, clipped_rows
 
 SCHEMA_VERSION = 1
 APP_DIR_NAME = "timebook"
@@ -176,11 +176,11 @@ class Store:
         with self._lock:
             cur = self._conn.execute(
                 "SELECT app_id, app_name, detail, host, title, start_ts, end_ts"
-                " FROM usage_events WHERE end_ts >= ? AND start_ts < ?"
+                " FROM usage_events WHERE end_ts > ? AND start_ts < ?"
                 " ORDER BY start_ts DESC",
                 (_ts(start), _ts(end)),
             )
-            return [self._row(r) for r in cur.fetchall()]
+            return clipped_rows([self._row(r) for r in cur.fetchall()], start, end)
 
     def rows_overlapping(self, start: datetime, end: datetime) -> list[EventRow]:
         with self._lock:
@@ -190,7 +190,7 @@ class Store:
                 " ORDER BY start_ts DESC",
                 (_ts(start), _ts(end)),
             )
-            return [self._row(r) for r in cur.fetchall()]
+            return clipped_rows([self._row(r) for r in cur.fetchall()], start, end)
 
     def rows_for_day(self, day: date) -> list[EventRow]:
         start = datetime(day.year, day.month, day.day)
@@ -244,7 +244,7 @@ class Store:
         with self._lock:
             cur = self._conn.execute(
                 "SELECT start_ts, end_ts, completed, preset_name FROM focus_events"
-                " WHERE end_ts >= ? AND start_ts < ? ORDER BY start_ts DESC",
+                " WHERE end_ts >= ? AND end_ts < ? ORDER BY start_ts DESC",
                 (_ts(start), _ts(end)),
             )
             return [

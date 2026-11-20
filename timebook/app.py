@@ -63,7 +63,8 @@ class TimebookApp(Adw.Application):
     def __init__(self, options: dict | None = None) -> None:
         super().__init__(
             application_id=APP_ID,
-            flags=Gio.ApplicationFlags.FLAGS_NONE,
+            flags=(Gio.ApplicationFlags.NON_UNIQUE if (options or {}).get("no_track")
+                   else Gio.ApplicationFlags.FLAGS_NONE),
         )
         self.options = options or {}
         self.ctx: AppContext | None = None
@@ -89,8 +90,6 @@ class TimebookApp(Adw.Application):
         settings = Settings(store)
 
         set_language(settings.language)
-        if settings.language != "auto":
-            set_system_language("zh" if settings.language == "zh" else "en")
 
         notifier = Notifier(app=self)
         notifier.enabled = settings.notifications_enabled
@@ -112,6 +111,7 @@ class TimebookApp(Adw.Application):
             notifier=notifier,
         )
         self.ctx = ctx
+        ctx.on_language_changed = self._on_language_changed
 
         # 引擎回调接线
         pomodoro.on_notify = ctx.notify
@@ -130,18 +130,29 @@ class TimebookApp(Adw.Application):
     def _on_activate(self, _app) -> None:
         if self.ctx is None:  # pragma: no cover - 防御
             return
-        if self.window is None:
+        first_activation = self.window is None
+        if first_activation:
             self.window = MainWindow(self, self.ctx)
             self.window.connect("close-request", self._on_window_close)
             self._setup_tray()
             self._start_timers()
 
-        self.window.present()
+        if not first_activation or not self.options.get("hidden"):
+            self.window.present()
+        self.window.refresh(force=True)
         page = self.options.get("page")
         if page:
             self.window.show_page(page)
         self._run_headless_tasks()
         self._schedule_quit()
+
+    def _on_language_changed(self) -> None:
+        if self.window is not None:
+            self.window.refresh(force=True)
+        if self.tray is not None:
+            self.tray.refresh(force=True)
+        if self._break_overlay is not None:
+            self._break_overlay.refresh_language()
 
     def _setup_tray(self) -> None:
         if not self.ctx.settings.tray_enabled:
@@ -174,9 +185,12 @@ class TimebookApp(Adw.Application):
             except Exception:  # pragma: no cover
                 pass
         self._tick_sources.clear()
-        if self.ctx is not None and not self.options.get("no_track"):
-            self.ctx.tracker.force_close()
-            self.ctx.forfeit.save()
+        if self._break_overlay is not None:
+            self._break_overlay.close()
+        if self.ctx is not None:
+            if not self.options.get("no_track"):
+                self.ctx.tracker.force_close()
+                self.ctx.forfeit.save()
             self.ctx.store.close()
         if self.tray is not None:
             self.tray.destroy()
@@ -317,6 +331,8 @@ class TimebookApp(Adw.Application):
 
     def _write_snapshot(self) -> None:
         if self.ctx is None:
+            return
+        if self.options.get("no_track"):
             return
         now = datetime.now()
         if (now.timestamp() - self._last_snapshot) < 55:

@@ -10,13 +10,15 @@ import logging
 import shutil
 import subprocess
 
+from ..core.l10n import T
+
 log = logging.getLogger("timebook.notify")
 
 
 class Notifier:
     """发通知的小封装。``enabled`` 由设置控制（App 层负责同步）。"""
 
-    def __init__(self, app_name: str = "时账 Timebook", icon: str = "timebook", app=None) -> None:
+    def __init__(self, app_name: str | None = None, icon: str = "timebook", app=None) -> None:
         self.app_name = app_name
         self.icon = icon
         self.app = app
@@ -41,7 +43,7 @@ class Notifier:
                 subprocess.run(
                     [
                         self._notify_send,
-                        "--app-name", self.app_name,
+                        "--app-name", self.app_name or T("时账", "Timebook"),
                         "--icon", self.icon,
                         "--expire-time", "8000",
                         title,

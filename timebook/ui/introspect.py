@@ -50,7 +50,7 @@ def count_widgets(root) -> int:
             continue
         total += 1
         if isinstance(node, Gtk.Stack):
-            stack = [node.get_visible_child()]
+            stack.append(node.get_visible_child())
             continue
         child = node.get_first_child()
         while child is not None:
