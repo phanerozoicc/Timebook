@@ -124,6 +124,10 @@ class UIWorkflowTests(unittest.TestCase):
             for key, *_ in PAGES:
                 with self.subTest(theme=theme, page=key):
                     page = self.page(key)
+                    # 切页后偶发需要再等一帧才完成尺寸分配（负载高时）
+                    deadline = time.monotonic() + 2
+                    while page.get_width() == 0 and time.monotonic() < deadline:
+                        drain(0.02)
                     self.assertGreater(page.get_width(), 0)
                     self.assertLessEqual(page.body.measure(Gtk.Orientation.HORIZONTAL, -1)[0], page.get_width())
                     self.assertLessEqual(self.window.get_width(), 860)
