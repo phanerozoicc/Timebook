@@ -125,6 +125,11 @@ check_dependencies() {
         else
             missing+=("python3-gi（PyGObject 绑定）")
         fi
+        if python3 -c 'import gi; gi.require_foreign("cairo")' >/dev/null 2>&1; then
+            echo "    ✓ python3-gi-cairo / cairo 桥接"
+        else
+            missing+=("python3-gi-cairo（PyGObject 的 cairo 结构转换器，图表绘制必需）")
+        fi
         if python3 -c 'import gi; gi.require_version("Gtk", "4.0"); from gi.repository import Gtk' >/dev/null 2>&1; then
             echo "    ✓ gir1.2-gtk-4.0 / GTK 4 typelib"
         else
@@ -147,7 +152,7 @@ check_dependencies() {
 
 请按发行版安装（Debian / Ubuntu）:
   sudo apt update
-  sudo apt install -y python3 python3-gi gir1.2-gtk-4.0 gir1.2-adw-1 python3-dbus libxss1 x11-utils libnotify-bin
+  sudo apt install -y python3 python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 python3-dbus libxss1 x11-utils libnotify-bin
 
 Fedora / RHEL 系:
   sudo dnf install -y python3 python3-gobject gtk4 libadwaita
