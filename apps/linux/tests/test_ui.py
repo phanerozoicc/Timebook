@@ -6,6 +6,7 @@ All data is isolated in SQLite memory or a temporary export directory.
 import csv
 import io
 import os
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -408,7 +409,21 @@ class UIWorkflowTests(unittest.TestCase):
         self.assertEqual(sum(r.duration for r in rows), 25)
         self.assertEqual(sum(r.duration for r in rows if r.title), 10)
 
+    @staticmethod
+    def _window_manager_present() -> bool | None:
+        """裸 Xvfb 没有窗口管理器，全屏协商不可能完成；xprop 可用时探测，失败返回 None（维持原断言）。"""
+        try:
+            out = subprocess.run(
+                ["xprop", "-root", "_NET_SUPPORTING_WM_CHECK"],
+                capture_output=True, text=True, timeout=5,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return out.returncode == 0 and "no such property" not in out.stdout
+
     def test_microbreak_fills_monitor_and_centers_content(self):
+        if self._window_manager_present() is False:
+            self.skipTest("bare X server (e.g. xvfb) has no window manager to acknowledge fullscreen")
         overlay = BreakOverlay(self.app, duration=20)
         self.addCleanup(overlay.close)
         overlay.present()
