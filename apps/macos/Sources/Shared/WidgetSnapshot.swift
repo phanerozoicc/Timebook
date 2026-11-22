@@ -40,7 +40,7 @@ struct WidgetSnapshot: Codable {
         return WidgetSnapshot(
             todaySeconds: todaySeconds,
             level: level.level,
-            levelName: level.name,
+            levelName: level.localName,
             levelLabel: level.label,
             pomoPhase: "idle",
             pomoRemain: 0,

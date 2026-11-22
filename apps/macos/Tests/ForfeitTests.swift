@@ -221,8 +221,11 @@ final class ForfeitTests: XCTestCase {
     }
 
     func testVerdictDistractingSiteOnEnabledCategory() {
-        XCTAssertEqual(verdict(bundleId: "com.google.Chrome", host: "www.douyin.com"), .site(name: "视频", host: "www.douyin.com"))
-        XCTAssertEqual(verdict(bundleId: "com.apple.Safari", host: "weibo.com"), .site(name: "社交", host: "weibo.com"))
+        // 类目名跟随界面语言（Verdict 走 SiteCategory.localName），断言动态取值
+        XCTAssertEqual(verdict(bundleId: "com.google.Chrome", host: "www.douyin.com"),
+                       .site(name: SiteCategory.forHost("www.douyin.com").localName, host: "www.douyin.com"))
+        XCTAssertEqual(verdict(bundleId: "com.apple.Safari", host: "weibo.com"),
+                       .site(name: SiteCategory.forHost("weibo.com").localName, host: "weibo.com"))
     }
 
     func testVerdictDisabledOrNonDistractingCategoryIsClean() {
@@ -309,7 +312,7 @@ final class ForfeitTests: XCTestCase {
 
         XCTAssertTrue(clean.addCustomDomain("zhihu.com"))
         XCTAssertFalse(clean.addCustomDomain("https://zhihu.com/follow"), "规整后视为重复")
-        XCTAssertEqual(rules(clean), .site(name: "自定义", host: "www.zhihu.com"), "自定义后即判")
+        XCTAssertEqual(rules(clean), .site(name: T("自定义", "Custom"), host: "www.zhihu.com"), "自定义后即判")
         XCTAssertTrue(clean.isCustomDomain("www.zhihu.com"), "子域一并命中")
         XCTAssertFalse(clean.isCustomDomain("notzhihu.com"), "非后缀不命中")
 

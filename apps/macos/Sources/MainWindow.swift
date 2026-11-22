@@ -91,10 +91,6 @@ private struct SidebarView: View {
                 ForEach(items, id: \.0) { item in
                     Label(T(item.2, english(item.0)), systemImage: item.1)
                         .tag(item.0)
-                        .listRowBackground(
-                            RoundedRectangle(cornerRadius: DS.radiusSmall, style: .continuous)
-                                .fill(tab == item.0 ? Color.brand.opacity(0.16) : .clear)
-                        )
                 }
             }
             Section {
@@ -113,11 +109,20 @@ private struct SidebarView: View {
                             .font(.caption2).foregroundStyle(.tertiary)
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(
+                    RoundedRectangle(cornerRadius: DS.radiusSmall, style: .continuous)
+                        .fill(Color.primary.opacity(0.05))
+                        .padding(.horizontal, 4)
+                )
                 .listRowSeparator(.hidden)
             }
         }
         .listStyle(.sidebar)
+        // 选中高亮用品牌橘，替换系统默认蓝
+        .tint(.brand)
     }
 
     private func english(_ tab: Int) -> String {
@@ -165,8 +170,15 @@ struct TodayPane: View {
         let apps = Agg.byApp(rows)
         let hosts = Agg.byHost(rows)
         let categories = Agg.byCategory(rows)
-        let maxSeconds = max(apps.map(\.seconds).max() ?? 1, hosts.map(\.seconds).max() ?? 1,
-                             categories.map(\.seconds).max() ?? 1)
+        // 条形归一化按各卡自己的最大值（跨卡取全局最大值会把网站级条形全部压扁）
+        let maxAppSeconds = max(apps.map(\.seconds).max() ?? 1, 1)
+        let maxHostSeconds = max(hosts.map(\.seconds).max() ?? 1, 1)
+        let maxCategorySeconds = max(categories.map(\.seconds).max() ?? 1, 1)
+        // 长尾聚合：榜首要看清楚，尾巴折叠成一行
+        let topHosts = hosts.prefix(5)
+        let restHosts = hosts.dropFirst(5)
+        let topApps = apps.prefix(5)
+        let restApps = apps.dropFirst(5)
 
         ScrollView {
             VStack(alignment: .leading, spacing: DS.gap) {
@@ -184,19 +196,25 @@ struct TodayPane: View {
                                 .font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.bordered)
-                        .tint(.white)
+                        .tint(.red)
                     }
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.red)
                     .padding(12)
-                    .background(RoundedRectangle(cornerRadius: DS.radius, style: .continuous).fill(.red))
+                    .background(RoundedRectangle(cornerRadius: DS.radius, style: .continuous)
+                        .fill(Color.red.opacity(0.12)))
+                    .overlay(RoundedRectangle(cornerRadius: DS.radius, style: .continuous)
+                        .strokeBorder(Color.red.opacity(0.35), lineWidth: 1))
                 }
                 // Hero：等级 + 合计 + 当前状态
                 HStack(alignment: .center, spacing: DS.gap) {
-                    LevelBadge(level: level.level, name: level.name, size: 64)
+                    LevelBadge(level: level.level, name: level.localName, size: 64)
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("\(level.name) · \(level.label)")
+                        // 英文界面中文名与 label 同文（Fresh · Fresh），去重
+                        Text(level.localName == level.label
+                             ? level.localName
+                             : "\(level.localName) · \(level.label)")
                             .font(.title3.weight(.semibold))
-                        Text(level.message)
+                        Text(level.localMessage)
                             .font(.callout)
                             .foregroundStyle(.secondary)
                         if let next = level.next {
@@ -211,10 +229,10 @@ struct TodayPane: View {
                             }
                             .frame(height: 6)
                             Text(nextHint(total: total, next: next))
-                                .font(.caption2).foregroundStyle(.tertiary)
+                                .font(.caption2).foregroundStyle(.secondary)
                         } else {
                             Text(T("已达最高等级，快去休息吧", "Max level reached — go rest"))
-                                .font(.caption2).foregroundStyle(.tertiary)
+                                .font(.caption2).foregroundStyle(.secondary)
                         }
                     }
                     Spacer()
@@ -241,7 +259,7 @@ struct TodayPane: View {
                         SectionHeader(symbol: "square.grid.2x2.fill", title: T("分类", "Categories"))
                         ForEach(categories) { slice in
                             BarRow(label: slice.name, seconds: slice.seconds,
-                                   maxSeconds: maxSeconds, dotHex: slice.hex)
+                                   maxSeconds: maxCategorySeconds, dotHex: slice.hex)
                         }
                     }
                     .card()
@@ -250,8 +268,14 @@ struct TodayPane: View {
                 if !hosts.isEmpty {
                     VStack(alignment: .leading, spacing: DS.gapSmall) {
                         SectionHeader(symbol: "globe", title: T("按网站", "By site"))
-                        ForEach(hosts) { slice in
-                            BarRow(label: slice.host, seconds: slice.seconds, maxSeconds: maxSeconds)
+                        ForEach(topHosts) { slice in
+                            BarRow(label: slice.host, seconds: slice.seconds, maxSeconds: maxHostSeconds)
+                        }
+                        if !restHosts.isEmpty {
+                            BarRow(label: T("其他 \(restHosts.count) 个网站", "\(restHosts.count) more sites"),
+                                   seconds: restHosts.reduce(0) { $0 + $1.seconds },
+                                   maxSeconds: maxHostSeconds,
+                                   tint: Color.primary.opacity(0.35))
                         }
                     }
                     .card()
@@ -264,8 +288,14 @@ struct TodayPane: View {
                     if apps.isEmpty {
                         EmptyState(symbol: "sparkles", title: T("开始使用电脑后，这里就会出现排行。", "Rankings appear once you use your Mac."))
                     } else {
-                        ForEach(apps) { slice in
-                            BarRow(label: slice.name, seconds: slice.seconds, maxSeconds: maxSeconds)
+                        ForEach(topApps) { slice in
+                            BarRow(label: slice.name, seconds: slice.seconds, maxSeconds: maxAppSeconds)
+                        }
+                        if !restApps.isEmpty {
+                            BarRow(label: T("其他 \(restApps.count) 个应用", "\(restApps.count) more apps"),
+                                   seconds: restApps.reduce(0) { $0 + $1.seconds },
+                                   maxSeconds: maxAppSeconds,
+                                   tint: Color.primary.opacity(0.35))
                         }
                     }
                 }
@@ -286,11 +316,11 @@ struct TodayPane: View {
     private func nextHint(total: TimeInterval, next: BrainLevel) -> String {
         let remainHours = next.minHours - total / 3600
         if remainHours < 1 {
-            return T("距「\(next.name)」还有不到 1 小时屏幕时间",
-                     "Less than 1h of screen time to \(next.name)")
+            return T("距「\(next.localName)」还有不到 1 小时屏幕时间",
+                     "Less than 1h of screen time to \(next.localName)")
         }
-        return T("距「\(next.name)」还有 \(Int(remainHours)) 小时屏幕时间",
-                 "\(Int(remainHours))h of screen time to \(next.name)")
+        return T("距「\(next.localName)」还有 \(Int(remainHours)) 小时屏幕时间",
+                 "\(Int(remainHours))h of screen time to \(next.localName)")
     }
 }
 
@@ -362,28 +392,17 @@ struct FocusPane: View {
                              value: Fmt.duration(focusToday.values.first?.seconds ?? 0), tint: .calmBlue)
                     StatCard(symbol: "drop.fill", title: T("喝水", "Water"),
                              value: "\(cups)/\(AppSettings.waterGoalCups)",
-                             tint: cups >= AppSettings.waterGoalCups ? .wellGreen : .water)
-                        .overlay(alignment: .bottomTrailing) {
-                            Button(T("记一杯", "+1")) { cups = store.addCup() }
-                                .buttonStyle(.borderless)
-                                .font(.caption.weight(.semibold))
-                                .tint(.water)
-                                .padding(10)
-                        }
+                             tint: cups >= AppSettings.waterGoalCups ? .wellGreen : .water,
+                             actionTitle: T("记一杯", "+1"),
+                             action: { cups = store.addCup() })
                     StatCard(symbol: "figure.stairs", title: T("连续活跃", "Active streak"),
-                             value: Fmt.duration(reminders.activeSeconds, compact: true), tint: .wellGreen)
-                        .overlay(alignment: .bottomTrailing) {
-                            Button {
-                                reminders.resetActiveTime()
-                                breakController.start(seconds: 20)
-                            } label: {
-                                Label(T("微休息", "Break"), systemImage: "pause.fill")
-                                    .font(.caption.weight(.semibold))
-                            }
-                            .buttonStyle(.borderless)
-                            .tint(.wellGreen)
-                            .padding(10)
-                        }
+                             value: Fmt.duration(reminders.activeSeconds, compact: true), tint: .wellGreen,
+                             actionTitle: T("微休息", "Break"),
+                             actionSymbol: "pause.fill",
+                             action: {
+                                 reminders.resetActiveTime()
+                                 breakController.start(seconds: 20)
+                             })
                 }
 
                 if !distractions.isEmpty {
@@ -456,7 +475,7 @@ struct FocusPane: View {
                 Button {
                     MenuPane.startPomodoro(pomodoro, ready: true)
                 } label: {
-                    Label("\(T("开始", "Start"))\(state.phase.label.dropFirst(2))", systemImage: "play.fill")
+                    Label(readyStartTitle, systemImage: "play.fill")
                         .font(.callout.weight(.semibold))
                 }
                 .buttonStyle(.borderedProminent)
@@ -465,6 +484,11 @@ struct FocusPane: View {
             }
         }
         .tint(.brand)
+    }
+
+    /// 待开始阶段的完整按钮文案（与菜单栏 popover 共用 PomodoroPhase.readyStartLabel）
+    private var readyStartTitle: String {
+        pomodoro.state.phase.readyStartLabel
     }
 
     private func refreshStats() {
@@ -511,7 +535,19 @@ struct StatsPane: View {
     @State private var heatOffset = 0
 
     var body: some View {
-        ScrollView {
+        // 环形图切片 = 网站分类 + 未分类的原生应用时长，图例加总与中心合计一致
+        let donutSlices: [Agg.CategorySlice] = {
+            var slices = categories
+            let categorized = categories.reduce(0) { $0 + $1.seconds }
+            let uncategorized = summary.total - categorized
+            if uncategorized > 60 {
+                slices.append(Agg.CategorySlice(name: T("其他应用", "Other apps"),
+                                                hex: 0x8A8F98, seconds: uncategorized))
+            }
+            return slices
+        }()
+
+        return ScrollView {
             VStack(alignment: .leading, spacing: DS.gap) {
                 Picker("", selection: $range) {
                     Text(T("最近 7 天", "Last 7 days")).tag("week")
@@ -540,16 +576,27 @@ struct StatsPane: View {
                         .cornerRadius(4)
                         .foregroundStyle(Color.brandGradient)
                     }
+                    .chartXAxis {
+                        if range == "week" {
+                            AxisMarks(values: series.map(\.0)) { _ in
+                                AxisValueLabel(format: .dateTime.weekday(.narrow))
+                            }
+                        } else {
+                            AxisMarks(values: .stride(by: .day, count: 5)) { _ in
+                                AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                            }
+                        }
+                    }
                     .chartYAxisLabel(T("小时", "hours"))
                     .frame(height: 190)
                 }
                 .card()
 
-                if !categories.isEmpty {
+                if !donutSlices.isEmpty {
                     VStack(alignment: .leading, spacing: DS.gapSmall) {
                         SectionHeader(symbol: "square.grid.2x2.fill", title: T("分类占比", "Categories"))
                         HStack(alignment: .center, spacing: 32) {
-                            Chart(categories) { slice in
+                            Chart(donutSlices) { slice in
                                 SectorMark(
                                     angle: .value("时长", slice.seconds),
                                     innerRadius: .ratio(0.58),
@@ -568,7 +615,7 @@ struct StatsPane: View {
                                 }
                             }
                             VStack(alignment: .leading, spacing: 7) {
-                                ForEach(categories) { slice in
+                                ForEach(donutSlices) { slice in
                                     HStack(spacing: 8) {
                                         Circle().fill(Color(hex: slice.hex)).frame(width: 9, height: 9)
                                         Text(slice.name)
@@ -605,7 +652,7 @@ struct StatsPane: View {
         let rows = store.rows(from: start, to: now.addingTimeInterval(60))
         let points = Agg.perDay(rows, count: days + 1, now: now)
         series = points.map { ($0.day, $0.seconds) }
-        categories = Array(Agg.byCategory(rows, limit: 6))
+        categories = Array(Agg.byCategory(rows, limit: 9))
         let total = points.reduce(TimeInterval(0)) { $0 + $1.seconds }
         let activeDays = max(1, points.filter { $0.seconds > 0 }.count)
         summary = (total, total / TimeInterval(activeDays), activeDays)

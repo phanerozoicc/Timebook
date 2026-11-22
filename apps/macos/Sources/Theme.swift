@@ -84,12 +84,28 @@ struct StatCard: View {
     let title: String
     let value: String
     var tint: Color = .brand
+    /// 行内操作（显示在标题行尾，避免压到下方数值）
+    var actionTitle: String?
+    var actionSymbol: String?
+    var action: (() -> Void)?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Label(title, systemImage: symbol)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .labelStyle(.titleAndIcon)
+            HStack(alignment: .firstTextBaseline) {
+                Label(title, systemImage: symbol)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .labelStyle(.titleAndIcon)
+                Spacer()
+                if let actionTitle, let action {
+                    Button(action: action) {
+                        Label(actionTitle, systemImage: actionSymbol ?? "")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .buttonStyle(.borderless)
+                    .tint(tint)
+                }
+            }
             Text(value)
                 .font(.system(size: 22, weight: .bold, design: .rounded))
                 .monospacedDigit()
@@ -111,6 +127,12 @@ struct BarRow: View {
     var dotHex: UInt32?
     var tint: Color = .brand
 
+    /// 条形填充色与圆点色绑定（分类条形的图例与数据色一致）
+    private var fillColor: Color {
+        if let hex = dotHex { return Color(hex: hex).opacity(0.9) }
+        return tint
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             if let hex = dotHex {
@@ -127,7 +149,7 @@ struct BarRow: View {
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.primary.opacity(0.07))
                     Capsule()
-                        .fill(tint)
+                        .fill(fillColor)
                         .frame(width: max(4, geo.size.width * seconds / max(maxSeconds, 1)))
                 }
             }
@@ -155,7 +177,7 @@ struct RingProgress: View {
             Circle()
                 .stroke(Color.primary.opacity(0.08), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
             Circle()
-                .trim(from: 0, to: max(0.001, min(1, progress)))
+                .trim(from: 0, to: min(1, max(0, progress)))
                 .stroke(gradient, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .shadow(color: Color.brand.opacity(0.35), radius: 6)
@@ -299,9 +321,9 @@ struct PresetPills: View {
                         .padding(.vertical, 5)
                         .background(
                             Capsule().fill(selected ? AnyShapeStyle(Color.brandGradient)
-                                                    : AnyShapeStyle(Color.primary.opacity(0.06)))
+                                                    : AnyShapeStyle(Color.primary.opacity(0.09)))
                         )
-                        .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
+                        .foregroundStyle(selected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary.opacity(0.75)))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(pill.title)

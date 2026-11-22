@@ -81,7 +81,7 @@ final class AppContext: ObservableObject {
             WidgetSnapshot(
                 todaySeconds: Agg.total(rows),
                 level: level.level,
-                levelName: level.name,
+                levelName: level.localName,
                 levelLabel: level.label,
                 pomoPhase: pomodoro.state.phase.rawValue,
                 pomoRemain: pomodoro.remain,

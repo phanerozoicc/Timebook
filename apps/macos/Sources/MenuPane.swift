@@ -222,7 +222,7 @@ private struct PomodoroBlock: View {
             }
         default:
             HStack(spacing: 6) {
-                pillButton("\(T("开始", "Start"))\(state.phase.label.dropFirst(2))",
+                pillButton(state.phase.readyStartLabel,
                            systemImage: "play.fill", prominent: true) {
                     MenuPane.startPomodoro(pomodoro, ready: true)
                 }

@@ -144,7 +144,7 @@ struct SettingsView: View {
                     HStack(spacing: 8) {
                         Circle().fill(category.color).frame(width: 9, height: 9)
                         VStack(alignment: .leading, spacing: 1) {
-                            Text(category.name)
+                            Text(category.localName)
                             Text(category.domains.joined(separator: " · "))
                                 .font(.caption2)
                                 .foregroundStyle(.tertiary)

@@ -54,7 +54,7 @@ enum Exporter {
             .seconds ?? 0
         let level = BrainLevel.forTotal(todayTotal)
         md += "- \(T("本周合计", "Week total"))：\(Fmt.duration(total))\n"
-        md += "- \(T("今日疲劳等级", "Today's brain level"))：L\(level.level) \(level.name)（\(level.label)）\n"
+        md += "- \(T("今日疲劳等级", "Today's brain level"))：L\(level.level) \(level.localName)（\(level.label)）\n"
         md += "- \(T("本周番茄", "Pomodoros this week"))：\(pomodoros) 🍅（\(Fmt.duration(focusSeconds))）\n"
         md += "- \(T("本周喝水", "Water today"))：\(cups)/\(goalCups) 💧\n\n"
 

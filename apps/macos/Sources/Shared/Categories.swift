@@ -5,28 +5,32 @@ import SwiftUI
 struct SiteCategory {
     let id: String
     let name: String
+    let nameEn: String
     let hex: UInt32
     let distracting: Bool
     let domains: [String]
 
+    /// 按当前界面语言取类目名。
+    var localName: String { T(name, nameEn) }
+
     static let all: [SiteCategory] = [
-        .init(id: "social", name: "社交", hex: 0xE1306C, distracting: true,
+        .init(id: "social", name: "社交", nameEn: "Social", hex: 0xE1306C, distracting: true,
               domains: ["facebook.com", "instagram.com", "twitter.com", "x.com", "tiktok.com", "reddit.com", "linkedin.com", "weibo.com", "threads.net", "pinterest.com"]),
-        .init(id: "video", name: "视频", hex: 0xFF0000, distracting: true,
+        .init(id: "video", name: "视频", nameEn: "Video", hex: 0xFF0000, distracting: true,
               domains: ["youtube.com", "netflix.com", "bilibili.com", "twitch.tv", "douyin.com", "iqiyi.com", "youku.com", "vimeo.com"]),
-        .init(id: "news", name: "资讯", hex: 0xF59E0B, distracting: false,
+        .init(id: "news", name: "资讯", nameEn: "News", hex: 0xF59E0B, distracting: false,
               domains: ["news.qq.com", "news.sina.com.cn", "cnn.com", "bbc.com", "bbc.co.uk", "nytimes.com", "thepaper.cn", "reuters.com", "36kr.com"]),
-        .init(id: "shopping", name: "购物", hex: 0x10B981, distracting: true,
+        .init(id: "shopping", name: "购物", nameEn: "Shopping", hex: 0x10B981, distracting: true,
               domains: ["taobao.com", "jd.com", "tmall.com", "amazon.com", "pinduoduo.com", "ebay.com", "aliexpress.com", "shopify.com"]),
-        .init(id: "work", name: "工作", hex: 0x3B82F6, distracting: false,
+        .init(id: "work", name: "工作", nameEn: "Work", hex: 0x3B82F6, distracting: false,
               domains: ["notion.so", "docs.google.com", "github.com", "gitlab.com", "stackoverflow.com", "figma.com", "atlassian.com", "juejin.cn", "segmentfault.com", "linux.do"]),
-        .init(id: "education", name: "学习", hex: 0x8B5CF6, distracting: false,
+        .init(id: "education", name: "学习", nameEn: "Learning", hex: 0x8B5CF6, distracting: false,
               domains: ["coursera.org", "udemy.com", "khanacademy.org", "edx.org", "mooc.cn", "icourse163.org", "roadmap.sh", "developer.mozilla.org"]),
-        .init(id: "entertainment", name: "娱乐", hex: 0xF97316, distracting: true,
+        .init(id: "entertainment", name: "娱乐", nameEn: "Fun", hex: 0xF97316, distracting: true,
               domains: ["store.steampowered.com", "epicgames.com", "huya.com", "douyu.com", "spotify.com", "music.163.com", "iq.com"]),
-        .init(id: "email", name: "邮件", hex: 0x06B6D4, distracting: false,
+        .init(id: "email", name: "邮件", nameEn: "Email", hex: 0x06B6D4, distracting: false,
               domains: ["gmail.com", "mail.google.com", "outlook.com", "mail.qq.com", "mail.163.com"]),
-        .init(id: "other", name: "其他", hex: 0x6B7280, distracting: false, domains: []),
+        .init(id: "other", name: "其他", nameEn: "Other", hex: 0x6B7280, distracting: false, domains: []),
     ]
 
     static func forHost(_ host: String) -> SiteCategory {

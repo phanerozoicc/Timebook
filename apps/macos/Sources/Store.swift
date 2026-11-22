@@ -284,7 +284,7 @@ enum Agg {
         return seconds
             .map { id, total in
                 let category = byId[id] ?? SiteCategory.all.last!
-                return CategorySlice(name: category.name, hex: category.hex, seconds: total)
+                return CategorySlice(name: category.localName, hex: category.hex, seconds: total)
             }
             .sorted { $0.seconds > $1.seconds }
             .prefix(limit)
@@ -341,9 +341,10 @@ enum Fmt {
             if m > 0 { return "\(m)m" }
             return "\(s)s"
         }
-        if h > 0 { return "\(h) 小时 \(m) 分" }
-        if m > 0 { return "\(m) 分" }
-        return "\(s) 秒"
+        // 完整格式随界面语言走，避免英文界面里出现 "31 小时 28 分"
+        if h > 0 { return T("\(h) 小时 \(m) 分", m > 0 ? "\(h)h \(m)m" : "\(h)h") }
+        if m > 0 { return T("\(m) 分", "\(m)m") }
+        return T("\(s) 秒", "\(s)s")
     }
 
     static func clock(_ date: Date) -> String {

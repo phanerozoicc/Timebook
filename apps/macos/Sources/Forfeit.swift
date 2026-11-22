@@ -162,10 +162,10 @@ enum ForfeitRules {
                         isCategoryEnabled: (String) -> Bool) -> Verdict? {
         if isDistractorApp(bundleId) { return .app }
         guard isBrowser(bundleId), let host, !host.isEmpty else { return nil }
-        if isCustomDomain(host) { return .site(name: "自定义", host: host) }
+        if isCustomDomain(host) { return .site(name: T("自定义", "Custom"), host: host) }
         let category = SiteCategory.forHost(host)
         guard category.id != "other", isCategoryEnabled(category.id) else { return nil }
-        return .site(name: category.name, host: host)
+        return .site(name: category.localName, host: host)
     }
 }
 

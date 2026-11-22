@@ -55,7 +55,7 @@ struct TimebookWidgetEntryView: View {
                     .padding(.horizontal, 5).padding(.vertical, 1)
                     .background(Capsule().fill(level.color))
                     .foregroundStyle(.white)
-                Text(level.name).font(.caption).foregroundStyle(.secondary)
+                Text(level.localName).font(.caption).foregroundStyle(.secondary)
                 Spacer()
             }
             Text(compactDuration(snapshot.todaySeconds))

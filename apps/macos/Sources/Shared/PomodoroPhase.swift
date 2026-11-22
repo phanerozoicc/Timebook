@@ -34,4 +34,13 @@ enum PomodoroPhase: String, Codable, CaseIterable {
         case .longReady: return T("准备长休", "Long-break ready")
         }
     }
+
+    /// 待开始阶段的完整开始按钮文案（修英文标签被 dropFirst(2) 截成 "Startcus ready"）。
+    var readyStartLabel: String {
+        switch self {
+        case .shortReady: return T("开始短休", "Start short break")
+        case .longReady: return T("开始长休", "Start long break")
+        default: return T("开始专注", "Start focus")
+        }
+    }
 }

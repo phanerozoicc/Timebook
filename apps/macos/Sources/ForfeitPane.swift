@@ -35,11 +35,13 @@ struct ForfeitPane: View {
                      tint: .forfeitLost)
             StatCard(symbol: "calendar.day.timeline.left", title: T("本周共荒", "Forfeited this week"),
                      value: T("\(forfeit.store.ledger.totalLost(inLastDays: 7)) 小时",
-                              "\(forfeit.store.ledger.totalLost(inLastDays: 7))h"),
-                     tint: .calmBlue)
+                              "\(forfeit.store.ledger.totalLost(inLastDays: 7))h"))
+            // 连续干净 0 天不算成就，用中性色；>0 才点亮绿色
             StatCard(symbol: "flame.fill", title: T("连续干净", "Clean streak"),
-                     value: T("\(forfeit.cleanStreak) 天", "\(forfeit.cleanStreak) days"),
-                     tint: .wellGreen)
+                     value: forfeit.cleanStreak == 1
+                         ? T("1 天", "1 day")
+                         : T("\(forfeit.cleanStreak) 天", "\(forfeit.cleanStreak) days"),
+                     tint: forfeit.cleanStreak > 0 ? .wellGreen : .brand)
         }
     }
 
@@ -65,7 +67,7 @@ struct ForfeitPane: View {
             }
             HStack(spacing: DS.gap) {
                 legendDot(Color.forfeitLost, T("荒掉了", "lost"))
-                legendDot(Color.wellGreen.opacity(0.85), T("属于你", "yours"))
+                legendDot(Color.wellGreen.opacity(0.72), T("属于你", "yours"))
                 legendDot(Color.forfeitFuture, T("还没到", "not yet"))
                 Spacer()
             }
@@ -75,7 +77,7 @@ struct ForfeitPane: View {
 
     private func hourCell(_ hour: Int, isLost: Bool, isFuture: Bool, isCurrent: Bool) -> some View {
         RoundedRectangle(cornerRadius: 7, style: .continuous)
-            .fill(isLost ? Color.forfeitLost : (isFuture ? Color.forfeitFuture : Color.wellGreen.opacity(0.85)))
+            .fill(isLost ? Color.forfeitLost : (isFuture ? Color.forfeitFuture : Color.wellGreen.opacity(0.72)))
             .frame(height: 34)
             .overlay {
                 Text(String(format: "%02d", hour))

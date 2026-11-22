@@ -69,7 +69,7 @@ final class LimitsEngine: ObservableObject {
                 if minutes >= 10 {
                     lastDistractNudge = input.now
                     onNotify?(T("该收心了 🧘", "Time to refocus 🧘"),
-                              T("在 \(host) 已经 \(minutes) 分钟了（\(category.name)）。", "\(minutes) min on \(host) (\(category.name))."))
+                              T("在 \(host) 已经 \(minutes) 分钟了（\(category.localName)）。", "\(minutes) min on \(host) (\(category.localName))."))
                     return "distract"
                 }
             }
